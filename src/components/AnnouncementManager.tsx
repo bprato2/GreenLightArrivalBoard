@@ -1,13 +1,22 @@
 "use client";
 
 /**
- * Side-effect component: announcement logic lives in useAnnouncements.
- * Mounted on the board so the hook owns a clear component boundary.
+ * Mount boundary for announcement side-effects.
+ * Logic lives in `useAnnouncements`; this component keeps the board tree explicit
+ * and exposes a polite live region for accessibility tooling.
  */
-export function AnnouncementManager({ active }: { active: boolean }) {
+export function AnnouncementManager({
+  active,
+  lastMessage,
+}: {
+  active: boolean;
+  lastMessage?: string | null;
+}) {
   return (
     <span className="sr-only" aria-live="polite">
-      {active ? "Announcements enabled" : "Announcements disabled"}
+      {active
+        ? lastMessage ?? "Announcements enabled"
+        : "Announcements disabled"}
     </span>
   );
 }

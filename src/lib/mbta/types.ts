@@ -11,7 +11,7 @@ export interface MbtaRelationships {
   };
 }
 
-export interface MbtaResource<TAttrs = Record<string, unknown>> {
+export interface MbtaResource<TAttrs extends object = object> {
   id: string;
   type: string;
   attributes: TAttrs;

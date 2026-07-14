@@ -1,6 +1,7 @@
 import {
   GREEN_D_STATIONS,
   resolveStation,
+  resolveStationByName,
   stationIndex,
   stationName,
   TARGET_STOP_ID,
@@ -9,6 +10,7 @@ import type {
   Arrival,
   ArrivalStatus,
   MapTrain,
+  MbtaRelationships,
   MbtaResource,
   PredictionResource,
   StopResource,
@@ -44,7 +46,7 @@ export function buildVehiclesUrl(apiKey: string): string {
 }
 
 function relatedId(
-  resource: MbtaResource,
+  resource: { relationships?: MbtaRelationships },
   key: string,
 ): string | null {
   const rel = resource.relationships?.[key]?.data;
@@ -56,16 +58,16 @@ function mergeIncluded(collection: StreamCollection, included: MbtaResource[]): 
   for (const item of included) {
     switch (item.type) {
       case "vehicle":
-        collection.vehicles.set(item.id, item as VehicleResource);
+        collection.vehicles.set(item.id, item as unknown as VehicleResource);
         break;
       case "stop":
-        collection.stops.set(item.id, item as StopResource);
+        collection.stops.set(item.id, item as unknown as StopResource);
         break;
       case "trip":
-        collection.trips.set(item.id, item as TripResource);
+        collection.trips.set(item.id, item as unknown as TripResource);
         break;
       case "prediction":
-        collection.predictions.set(item.id, item as PredictionResource);
+        collection.predictions.set(item.id, item as unknown as PredictionResource);
         break;
       default:
         break;
@@ -113,9 +115,9 @@ export function applyStreamEvent(
     }
     for (const item of list) {
       if (item?.type === "prediction") {
-        collection.predictions.set(item.id, item as PredictionResource);
+        collection.predictions.set(item.id, item as unknown as PredictionResource);
       } else if (item?.type === "vehicle") {
-        collection.vehicles.set(item.id, item as VehicleResource);
+        collection.vehicles.set(item.id, item as unknown as VehicleResource);
       }
     }
     mergeIncluded(collection, included);
@@ -139,9 +141,9 @@ export function applyStreamEvent(
   for (const item of list) {
     if (!item?.id || !item.type) continue;
     if (item.type === "prediction") {
-      collection.predictions.set(item.id, item as PredictionResource);
+      collection.predictions.set(item.id, item as unknown as PredictionResource);
     } else if (item.type === "vehicle") {
-      collection.vehicles.set(item.id, item as VehicleResource);
+      collection.vehicles.set(item.id, item as unknown as VehicleResource);
     }
   }
   mergeIncluded(collection, included);
@@ -150,13 +152,18 @@ export function applyStreamEvent(
 function parentStopId(stopId: string | null, stops: Map<string, StopResource>): string | null {
   if (!stopId) return null;
   if (stopId.startsWith("place-")) return stopId;
+
   const stop = stops.get(stopId);
-  // Stops often relate back to parent_station
   const parent = stop ? relatedId(stop, "parent_station") : null;
-  if (parent) return parent;
-  // Heuristic: known D place ids embed in many child ids via resolveStation
-  const resolved = resolveStation(stopId);
-  return resolved?.id ?? stopId;
+  if (parent?.startsWith("place-")) return parent;
+
+  const fromId = resolveStation(stopId);
+  if (fromId) return fromId.id;
+
+  const fromName = resolveStationByName(stop?.attributes.name);
+  if (fromName) return fromName.id;
+
+  return parent ?? stopId;
 }
 
 function describeVehicleLocation(

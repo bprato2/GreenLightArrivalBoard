@@ -11,7 +11,8 @@ import {
 } from "@/lib/mbta/parse";
 import type { Arrival, MapTrain, StreamCollection } from "@/lib/mbta/types";
 
-const RECONNECT_MS = 2 * 60 * 60 * 1000; // Force healthy reconnect every 2h (MBTA streams can go quiet).
+/** MBTA streams can go quiet; force a clean reconnect periodically. */
+const RECONNECT_MS = 2 * 60 * 60 * 1000;
 const TICK_MS = 1000;
 
 export interface UseMbtaStreamResult {
@@ -38,17 +39,11 @@ export function useMbtaStream(): UseMbtaStreamResult {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [generation, setGeneration] = useState(0);
 
-  const dirtyRef = useRef(true);
   const predOpen = useRef(false);
   const vehOpen = useRef(false);
 
   const syncConnected = useCallback(() => {
     setConnected(predOpen.current && vehOpen.current);
-  }, []);
-
-  const markDirty = useCallback(() => {
-    dirtyRef.current = true;
-    setLastEventAt(Date.now());
   }, []);
 
   useEffect(() => {
@@ -73,7 +68,7 @@ export function useMbtaStream(): UseMbtaStreamResult {
       const handle = (eventType: string) => (ev: MessageEvent) => {
         if (cancelled) return;
         applyStreamEvent(collectionRef.current, eventType, ev.data, primaryType);
-        markDirty();
+        setLastEventAt(Date.now());
         setError(null);
       };
 
@@ -81,8 +76,6 @@ export function useMbtaStream(): UseMbtaStreamResult {
       es.addEventListener("add", handle("add"));
       es.addEventListener("update", handle("update"));
       es.addEventListener("remove", handle("remove"));
-
-      // Some environments deliver unnamed messages — treat as update/reset best-effort.
       es.onmessage = (ev) => handle("update")(ev);
 
       es.onopen = () => {
@@ -93,7 +86,6 @@ export function useMbtaStream(): UseMbtaStreamResult {
       es.onerror = () => {
         onOpenFlag.current = false;
         syncConnected();
-        // EventSource auto-retries; surface a soft status only.
         if (!cancelled) {
           setError((prev) => prev ?? "Reconnecting to MBTA…");
         }
@@ -103,7 +95,6 @@ export function useMbtaStream(): UseMbtaStreamResult {
     predOpen.current = false;
     vehOpen.current = false;
     collectionRef.current = emptyCollection();
-    dirtyRef.current = true;
 
     attach(buildPredictionsUrl(apiKey), "prediction", predOpen);
     attach(buildVehiclesUrl(apiKey), "vehicle", vehOpen);
@@ -119,24 +110,19 @@ export function useMbtaStream(): UseMbtaStreamResult {
       predOpen.current = false;
       vehOpen.current = false;
     };
-  }, [generation, markDirty, syncConnected]);
+  }, [generation, syncConnected]);
 
-  // 1 Hz display clock — cheap countdown updates; recompute only when stream dirty or each tick.
+  // 1 Hz display clock — cheap countdown updates.
   useEffect(() => {
     const id = window.setInterval(() => {
       const now = Date.now();
       setNowMs(now);
-      if (!dirtyRef.current && arrivals.length === 0 && trains.length === 0) {
-        // Still tick minutes for existing rows
-      }
       const derived = deriveBoardState(collectionRef.current, now);
-      dirtyRef.current = false;
       setArrivals(derived.arrivals);
       setTrains(derived.trains);
     }, TICK_MS);
 
     return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional stable interval
   }, []);
 
   return { arrivals, trains, connected, error, lastEventAt, nowMs };

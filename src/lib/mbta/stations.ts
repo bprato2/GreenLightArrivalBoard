@@ -1,6 +1,6 @@
 /**
- * Green Line D branch stations ordered Riverside → Government Center.
- * Stop parent (place-*) IDs match MBTA V3 `filter[stop]` / vehicle stop refs.
+ * Green Line D branch stations ordered Riverside → downtown core.
+ * Parent `place-*` IDs match MBTA V3 stop filters / vehicle stop refs.
  */
 export interface StationInfo {
   id: string;
@@ -18,24 +18,25 @@ export const GREEN_D_STATIONS: StationInfo[] = [
   { id: "place-newtn", name: "Newton Highlands", shortName: "N. Highlands", index: 4 },
   { id: "place-newto", name: "Newton Centre", shortName: "N. Centre", index: 5 },
   { id: "place-chhil", name: "Chestnut Hill", shortName: "Chestnut Hl", index: 6 },
-  { id: "place-rvrwy", name: "Reservoir", shortName: "Reservoir", index: 7 },
+  { id: "place-rsmnl", name: "Reservoir", shortName: "Reservoir", index: 7 },
   { id: "place-bcnfd", name: "Beaconsfield", shortName: "Beaconsfld", index: 8 },
   { id: "place-brkhl", name: "Brookline Hills", shortName: "Brk Hills", index: 9 },
   { id: "place-bvmnl", name: "Brookline Village", shortName: "Brk Village", index: 10 },
-  { id: "place-fenwy", name: "Fenway", shortName: "Fenway", index: 11 },
-  { id: "place-kencl", name: "Kenmore", shortName: "Kenmore", index: 12 },
-  { id: "place-hymnl", name: "Hynes Convention Center", shortName: "Hynes", index: 13 },
-  { id: "place-coecl", name: "Copley", shortName: "Copley", index: 14 },
-  { id: "place-armnl", name: "Arlington", shortName: "Arlington", index: 15 },
-  { id: "place-boyls", name: "Boylston", shortName: "Boylston", index: 16 },
-  { id: "place-pktrm", name: "Park Street", shortName: "Park St", index: 17 },
-  { id: "place-gover", name: "Government Center", shortName: "Gov Ctr", index: 18 },
+  { id: "place-longw", name: "Longwood", shortName: "Longwood", index: 11 },
+  { id: "place-fenwy", name: "Fenway", shortName: "Fenway", index: 12 },
+  { id: "place-kencl", name: "Kenmore", shortName: "Kenmore", index: 13 },
+  { id: "place-hymnl", name: "Hynes Convention Center", shortName: "Hynes", index: 14 },
+  { id: "place-coecl", name: "Copley", shortName: "Copley", index: 15 },
+  { id: "place-armnl", name: "Arlington", shortName: "Arlington", index: 16 },
+  { id: "place-boyls", name: "Boylston", shortName: "Boylston", index: 17 },
+  { id: "place-pktrm", name: "Park Street", shortName: "Park St", index: 18 },
+  { id: "place-gover", name: "Government Center", shortName: "Gov Ctr", index: 19 },
 ];
 
 export const TARGET_STOP_ID = "place-newtn";
 export const TARGET_STATION_NAME = "Newton Highlands";
 export const ROUTE_ID = "Green-D";
-/** Eastbound / inbound toward Government Center. */
+/** Eastbound / inbound toward downtown (Government Center / Union Square). */
 export const INBOUND_DIRECTION_ID = "1";
 
 const byId = new Map(GREEN_D_STATIONS.map((s) => [s.id, s]));
@@ -46,7 +47,7 @@ const byName = new Map(
   ]),
 );
 
-/** Resolve a place-* id, child stop id (e.g. 70170), or name to a known D station. */
+/** Resolve a place-* id, child stop id, or name to a known D station. */
 export function resolveStation(
   stopIdOrName: string | null | undefined,
 ): StationInfo | null {
@@ -54,14 +55,16 @@ export function resolveStation(
   const direct = byId.get(stopIdOrName);
   if (direct) return direct;
 
-  // Child platform IDs often start with the parent place id pattern; walk known parents.
+  const byExactName = byName.get(stopIdOrName.toLowerCase());
+  if (byExactName) return byExactName;
+
+  // Child platform IDs sometimes encode the place slug (e.g. node-newto-…).
   for (const station of GREEN_D_STATIONS) {
-    if (stopIdOrName.startsWith(station.id.replace("place-", ""))) {
-      return station;
-    }
+    const slug = station.id.replace("place-", "");
+    if (stopIdOrName.includes(slug)) return station;
   }
 
-  return byName.get(stopIdOrName.toLowerCase()) ?? null;
+  return null;
 }
 
 export function stationIndex(stopId: string | null | undefined): number | null {
@@ -70,4 +73,16 @@ export function stationIndex(stopId: string | null | undefined): number | null {
 
 export function stationName(stopId: string | null | undefined): string | null {
   return resolveStation(stopId)?.name ?? null;
+}
+
+/** Match a human stop name (from MBTA stop attributes) to a D station. */
+export function resolveStationByName(name: string | null | undefined): StationInfo | null {
+  if (!name) return null;
+  const exact = byName.get(name.toLowerCase());
+  if (exact) return exact;
+  // MBTA sometimes appends platform text; match longest prefix.
+  for (const station of GREEN_D_STATIONS) {
+    if (name.toLowerCase().startsWith(station.name.toLowerCase())) return station;
+  }
+  return null;
 }
