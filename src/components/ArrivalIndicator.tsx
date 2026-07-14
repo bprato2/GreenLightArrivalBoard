@@ -24,9 +24,9 @@ export function ArrivalIndicator({ phase }: ArrivalIndicatorProps) {
   if (phase === "pulse") {
     return (
       <div
-        className="arrival-indicator h-5 w-5 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.85)] animate-alert-pulse"
-        aria-label="Train approaching soon"
-        title="Pulse alert (3–7 min)"
+        className="arrival-indicator h-5 w-5 rounded-full bg-emerald-500 shadow-[0_0_15px_#10b981] animate-pulse"
+        aria-label="Green light — leave now"
+        title="Green light window (3–7 min)"
       />
     );
   }

@@ -1,5 +1,6 @@
 import {
   GREEN_D_STATIONS,
+  MINI_MAP_MAX_STATION_INDEX,
   resolveStation,
   resolveStationByName,
   stationIndex,
@@ -29,7 +30,6 @@ export function buildPredictionsUrl(apiKey: string): string {
   const params = new URLSearchParams({
     "filter[stop]": TARGET_STOP_ID,
     "filter[route]": "Green-D",
-    "filter[direction_id]": "1",
     include: "vehicle,trip,stop",
     api_key: apiKey,
   });
@@ -265,10 +265,14 @@ export function deriveBoardState(
       attrs.status ||
       "Government Center";
 
+    const directionId =
+      trip?.attributes.direction_id ?? attrs.direction_id ?? 0;
+
     arrivals.push({
       id: prediction.id,
       vehicleId,
       tripId,
+      directionId,
       headsign,
       etaMs,
       minutesAway,
@@ -289,6 +293,8 @@ export function deriveBoardState(
     const directionId = vehicle.attributes.direction_id ?? 0;
     const location = describeVehicleLocation(vehicle, collection.stops);
     if (location.stationIndex === null) continue;
+    // Mini-map covers Riverside → Newton Highlands only.
+    if (location.stationIndex > MINI_MAP_MAX_STATION_INDEX) continue;
 
     // For IN_TRANSIT_TO / INCOMING_AT, map position sits between previous and current.
     let stationIndexValue = location.stationIndex;

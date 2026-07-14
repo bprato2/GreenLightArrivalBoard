@@ -13,6 +13,7 @@ interface ArrivalRowProps {
 export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
   const eta = formatMinutes(arrival.minutesAway);
   const glowPx = 4 + glow * 14;
+  const directionLabel = arrival.directionId === 1 ? "INB" : "OUT";
 
   return (
     <motion.div
@@ -29,7 +30,9 @@ export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
             className="led-text text-[clamp(1.1rem,2.4vw,1.85rem)] font-semibold tracking-wide truncate"
             style={{ textShadow: `0 0 ${glowPx}px rgba(255,176,0,${0.35 + glow * 0.45})` }}
           >
-            D → {arrival.headsign}
+            <span className="text-amber-500/90">{directionLabel}</span>
+            <span className="mx-2 text-amber-700/60">•</span>
+            {arrival.headsign}
           </span>
           {arrival.isDelayed && (
             <span className="led-text text-xs uppercase tracking-[0.2em] text-orange-400/90 shrink-0">

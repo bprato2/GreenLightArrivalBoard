@@ -72,6 +72,8 @@ export interface Arrival {
   id: string;
   vehicleId: string | null;
   tripId: string | null;
+  /** 1 = inbound (toward Government Center), 0 = outbound (toward Riverside). */
+  directionId: number;
   headsign: string;
   /** Predicted arrival / departure Instant (ms). Prefer arrival_time, else departure. */
   etaMs: number;

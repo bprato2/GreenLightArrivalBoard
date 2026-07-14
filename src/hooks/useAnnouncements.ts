@@ -1,15 +1,34 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { playMbtaChime, unlockAudio } from "@/lib/audio/chime";
-import { buildArrivalAnnouncement, speakAnnouncement } from "@/lib/audio/speech";
+import { playMBTAChime, unlockAudio } from "@/lib/audio/chime";
+import {
+  buildArrivingAnnouncement,
+  buildThreeMinuteAnnouncement,
+  speakAnnouncement,
+} from "@/lib/audio/speech";
 import type { Arrival } from "@/lib/mbta/types";
 
-const ANNOUNCE_WITHIN_MINUTES = 2;
+type AnnouncementKind = "3min" | "arriving";
+
+function announcementKey(arrival: Arrival, kind: AnnouncementKind): string {
+  const trip = arrival.tripId ?? arrival.id;
+  return `${trip}:${kind}`;
+}
+
+async function announce(arrival: Arrival, kind: AnnouncementKind): Promise<void> {
+  await unlockAudio();
+  await playMBTAChime();
+  const text =
+    kind === "3min"
+      ? buildThreeMinuteAnnouncement(arrival.headsign)
+      : buildArrivingAnnouncement(arrival.headsign);
+  await speakAnnouncement(text);
+}
 
 /**
- * Announces each inbound train at most once when it enters the imminent window.
- * Uses Web Audio chime + SpeechSynthesis (no audio files).
+ * Chime + TTS for inbound trains at the 3-minute and arriving windows.
+ * Each trip is announced at most once per milestone.
  */
 export function useAnnouncements(
   arrivals: Arrival[],
@@ -17,6 +36,7 @@ export function useAnnouncements(
 ): { testAnnouncement: () => Promise<void> } {
   const announcedIds = useRef(new Set<string>());
   const unlocked = useRef(false);
+  const queue = useRef(Promise.resolve());
 
   useEffect(() => {
     if (!enabled) return;
@@ -38,36 +58,36 @@ export function useAnnouncements(
   useEffect(() => {
     if (!enabled) return;
 
-    const liveIds = new Set(arrivals.map((a) => a.id));
-    // Forget ids that left the board so a later trip reuse can announce again.
-    for (const id of announcedIds.current) {
-      if (!liveIds.has(id)) announcedIds.current.delete(id);
+    const liveTrips = new Set(
+      arrivals.filter((a) => a.directionId === 1).map((a) => a.tripId ?? a.id),
+    );
+    for (const key of announcedIds.current) {
+      const trip = key.replace(/:(3min|arriving)$/, "");
+      if (!liveTrips.has(trip)) announcedIds.current.delete(key);
     }
 
-    const next = arrivals.find(
-      (a) =>
-        a.minutesAway <= ANNOUNCE_WITHIN_MINUTES &&
-        !announcedIds.current.has(a.id),
-    );
-    if (!next) return;
+    const inbound = arrivals.filter((a) => a.directionId === 1);
 
-    announcedIds.current.add(next.id);
-    void (async () => {
-      await unlockAudio();
-      await playMbtaChime();
-      await new Promise((r) => setTimeout(r, 400));
-      await speakAnnouncement(buildArrivalAnnouncement(next.headsign));
-    })();
+    for (const arrival of inbound) {
+      const threeKey = announcementKey(arrival, "3min");
+      if (arrival.minutesAway === 3 && !announcedIds.current.has(threeKey)) {
+        announcedIds.current.add(threeKey);
+        queue.current = queue.current.then(() => announce(arrival, "3min"));
+      }
+
+      const arrivingKey = announcementKey(arrival, "arriving");
+      if (arrival.minutesAway <= 1 && !announcedIds.current.has(arrivingKey)) {
+        announcedIds.current.add(arrivingKey);
+        queue.current = queue.current.then(() => announce(arrival, "arriving"));
+      }
+    }
   }, [arrivals, enabled]);
 
   return {
     testAnnouncement: async () => {
       await unlockAudio();
-      await playMbtaChime();
-      await new Promise((r) => setTimeout(r, 400));
-      await speakAnnouncement(
-        buildArrivalAnnouncement("Government Center"),
-      );
+      await playMBTAChime();
+      await speakAnnouncement(buildThreeMinuteAnnouncement("Government Center"));
     },
   };
 }

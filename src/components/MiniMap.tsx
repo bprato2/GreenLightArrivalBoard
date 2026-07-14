@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { GREEN_D_STATIONS, TARGET_STOP_ID } from "@/lib/mbta/stations";
+import { MINI_MAP_STATIONS, TARGET_STOP_ID } from "@/lib/mbta/stations";
 import type { MapTrain } from "@/lib/mbta/types";
 
 interface MiniMapProps {
@@ -9,11 +9,9 @@ interface MiniMapProps {
   glow: number;
 }
 
-/** Simplified horizontal Green Line D map (~bottom 20% of the board). */
+/** Simplified horizontal Green Line D map — Riverside through Newton Highlands. */
 export function MiniMap({ trains, glow }: MiniMapProps) {
-  const count = GREEN_D_STATIONS.length;
-  // Show a readable subset of labels on tablet width.
-  const labelEvery = 2;
+  const count = MINI_MAP_STATIONS.length;
 
   return (
     <div className="mini-map flex h-full flex-col justify-center px-4 pb-2 pt-1">
@@ -21,7 +19,7 @@ export function MiniMap({ trains, glow }: MiniMapProps) {
         className="led-text mb-2 text-center text-[0.7rem] uppercase tracking-[0.35em] text-amber-600/80"
         style={{ textShadow: `0 0 ${4 + glow * 8}px rgba(255,176,0,0.35)` }}
       >
-        Green Line D · Riverside → Government Center
+        Green Line D · Riverside → Newton Highlands
       </div>
 
       <div className="relative mx-auto w-full max-w-[96%] flex-1">
@@ -30,10 +28,9 @@ export function MiniMap({ trains, glow }: MiniMapProps) {
 
         {/* Station ticks + labels */}
         <div className="relative h-full">
-          {GREEN_D_STATIONS.map((station, i) => {
+          {MINI_MAP_STATIONS.map((station, i) => {
             const left = `${(i / (count - 1)) * 100}%`;
             const isHere = station.id === TARGET_STOP_ID;
-            const showLabel = i % labelEvery === 0 || isHere || i === count - 1;
             return (
               <div
                 key={station.id}
@@ -47,15 +44,13 @@ export function MiniMap({ trains, glow }: MiniMapProps) {
                       : "border-emerald-400/70 bg-black"
                   }`}
                 />
-                {showLabel && (
-                  <div
-                    className={`absolute left-1/2 top-4 w-16 -translate-x-1/2 text-center text-[0.55rem] leading-tight tracking-wide ${
-                      isHere ? "text-amber-300" : "text-emerald-500/70"
-                    }`}
-                  >
-                    {station.shortName}
-                  </div>
-                )}
+                <div
+                  className={`absolute left-1/2 top-4 w-16 -translate-x-1/2 text-center text-[0.55rem] leading-tight tracking-wide ${
+                    isHere ? "text-amber-300" : "text-emerald-500/70"
+                  }`}
+                >
+                  {station.shortName}
+                </div>
               </div>
             );
           })}

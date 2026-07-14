@@ -19,10 +19,11 @@ import { TARGET_STATION_NAME } from "@/lib/mbta/stations";
 export function ArrivalBoard() {
   const { settings, hydrated } = useSettings();
   const { arrivals, trains, connected, error } = useMbtaStream();
-  const { dateLine, timeLine } = useClock();
+  const { timeLine } = useClock();
   const weather = useWeather(settings.weatherEnabled);
-  const closest = arrivals[0]?.minutesAway ?? null;
-  const alert = useArrivalAlert(closest, settings);
+  const closestInbound =
+    arrivals.find((a) => a.directionId === 1)?.minutesAway ?? null;
+  const alert = useArrivalAlert(closestInbound, settings);
   useAnnouncements(arrivals, settings.announcementsEnabled);
 
   const glow = settings.ledGlowIntensity;
@@ -48,20 +49,12 @@ export function ArrivalBoard() {
       <div className="led-vignette pointer-events-none absolute inset-0 z-10" aria-hidden />
 
       {/* Header ~ compact */}
-      <header className="relative z-30 flex shrink-0 items-start justify-between gap-4 px-5 pt-4 pb-2">
-        <div>
-          <div
-            className="led-text text-[clamp(0.75rem,1.5vw,1rem)] uppercase tracking-[0.28em] text-amber-500/75"
-            style={{ textShadow: `0 0 ${4 + glow * 10}px rgba(255,176,0,0.35)` }}
-          >
-            {dateLine}
-          </div>
-          <div
-            className="led-text mt-1 text-[clamp(1.25rem,2.8vw,2rem)] tabular-nums tracking-wider"
-            style={{ textShadow: `0 0 ${6 + glow * 14}px rgba(255,176,0,${0.4 + glow * 0.4})` }}
-          >
-            {timeLine}
-          </div>
+      <header className="relative z-30 flex shrink-0 items-center justify-between gap-4 px-5 pt-3 pb-1">
+        <div
+          className="led-text text-[clamp(1.35rem,2.8vw,2.1rem)] tabular-nums tracking-wider"
+          style={{ textShadow: `0 0 ${6 + glow * 14}px rgba(255,176,0,${0.4 + glow * 0.4})` }}
+        >
+          {timeLine}
         </div>
 
         <div className="flex flex-col items-center gap-2">
@@ -74,7 +67,7 @@ export function ArrivalBoard() {
           <div className="flex items-center gap-3">
             <ArrivalIndicator phase={alert.phase} />
             <span className="led-text text-[0.65rem] uppercase tracking-[0.25em] text-amber-600/80">
-              Inbound · Green Line D
+              Green Line D
             </span>
             <span
               className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-red-500/80"}`}
@@ -101,7 +94,7 @@ export function ArrivalBoard() {
       >
         <div className="mb-1 flex items-end justify-between border-b border-amber-900/40 pb-1">
           <span className="led-text text-[0.7rem] uppercase tracking-[0.3em] text-amber-600/75">
-            Next inbound arrivals
+            Next arrivals
           </span>
           <Link
             href="/settings"
