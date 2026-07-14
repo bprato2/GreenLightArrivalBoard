@@ -16,7 +16,6 @@ export function speakAnnouncement(text: string): Promise<void> {
     utter.volume = 1;
     utter.lang = "en-US";
 
-    // Prefer a clear US English voice when available.
     const voices = synth.getVoices();
     const preferred =
       voices.find((v) => /en-US/i.test(v.lang) && /Google|Microsoft|Samantha|Jenny/i.test(v.name)) ||
@@ -30,7 +29,17 @@ export function speakAnnouncement(text: string): Promise<void> {
   });
 }
 
-export function buildArrivalAnnouncement(headsign: string): string {
+export function buildThreeMinuteAnnouncement(headsign: string): string {
   const dest = headsign?.trim() || "Government Center";
-  return `The next inbound Green Line D train to ${dest} is arriving.`;
+  return `The next train to ${dest} is arriving in three minutes.`;
+}
+
+export function buildArrivingAnnouncement(headsign: string): string {
+  const dest = headsign?.trim() || "Government Center";
+  return `The next train to ${dest} is now arriving.`;
+}
+
+/** @deprecated Use buildThreeMinuteAnnouncement or buildArrivingAnnouncement */
+export function buildArrivalAnnouncement(headsign: string): string {
+  return buildArrivingAnnouncement(headsign);
 }

@@ -1,6 +1,6 @@
 /**
- * Synthetic MBTA-style two-tone chime via the Web Audio API (no audio files).
- * Approximates the classic high-low ding used on Green Line cars / platforms.
+ * Synthetic MBTA station chime via the Web Audio API (no audio files).
+ * Two triangle-wave tones: F#5 then D5 with exponential decay envelopes.
  */
 
 let sharedCtx: AudioContext | null = null;
@@ -17,44 +17,52 @@ function getAudioContext(): AudioContext | null {
   return sharedCtx;
 }
 
-function tone(
+function triangleTone(
   ctx: AudioContext,
   frequency: number,
   start: number,
-  duration: number,
+  decaySeconds: number,
   gainValue: number,
 ): void {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.type = "sine";
+  osc.type = "triangle";
   osc.frequency.value = frequency;
   gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(gainValue, start + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  gain.gain.exponentialRampToValueAtTime(gainValue, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + decaySeconds);
   osc.connect(gain);
   gain.connect(ctx.destination);
   osc.start(start);
-  osc.stop(start + duration + 0.05);
+  osc.stop(start + decaySeconds + 0.05);
 }
 
-/** Play the two-tone chime. Safe to call repeatedly; resumes suspended contexts. */
-export async function playMbtaChime(): Promise<void> {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  if (ctx.state === "suspended") {
-    try {
-      await ctx.resume();
-    } catch {
+/** Play the iconic two-tone MBTA chime. Resolves when both notes have finished. */
+export function playMBTAChime(): Promise<void> {
+  return new Promise((resolve) => {
+    const ctx = getAudioContext();
+    if (!ctx) {
+      resolve();
       return;
     }
-  }
 
-  const t0 = ctx.currentTime + 0.02;
-  // High then low — classic MBTA-ish interval (approx. E6 → B5).
-  tone(ctx, 1318.5, t0, 0.28, 0.22);
-  tone(ctx, 987.8, t0 + 0.32, 0.38, 0.2);
+    const play = () => {
+      const t0 = ctx.currentTime + 0.02;
+      triangleTone(ctx, 739.99, t0, 0.6, 0.28); // F#5
+      triangleTone(ctx, 587.33, t0 + 0.4, 0.8, 0.24); // D5
+      window.setTimeout(() => resolve(), 1300);
+    };
+
+    if (ctx.state === "suspended") {
+      void ctx.resume().then(play).catch(() => resolve());
+    } else {
+      play();
+    }
+  });
 }
+
+/** @deprecated Use playMBTAChime */
+export const playMbtaChime = playMBTAChime;
 
 export async function unlockAudio(): Promise<void> {
   const ctx = getAudioContext();
