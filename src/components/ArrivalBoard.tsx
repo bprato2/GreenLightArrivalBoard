@@ -7,6 +7,7 @@ import { ArrivalRow } from "@/components/ArrivalRow";
 import { AnnouncementManager } from "@/components/AnnouncementManager";
 import { LeaveForStationNow } from "@/components/LeaveForStationNow";
 import { MiniMap } from "@/components/MiniMap";
+import { ServiceFrequency } from "@/components/ServiceFrequency";
 import { StationHeader } from "@/components/StationHeader";
 import { Weather } from "@/components/Weather";
 import { useAnnouncements } from "@/hooks/useAnnouncements";
@@ -25,7 +26,7 @@ function mergeBoardRows(live: Arrival[], scheduled: Arrival[]): Arrival[] {
 export function ArrivalBoard() {
   const { settings, hydrated } = useSettings();
   const { arrivals, trains, connected, error, nowMs } = useMbtaStream();
-  const scheduled = useMbtaSchedules(arrivals, nowMs);
+  const { scheduled, schedules } = useMbtaSchedules(arrivals, nowMs);
   const boardRows = mergeBoardRows(arrivals, scheduled);
   const { timeLine } = useClock();
   const weather = useWeather(settings.weatherEnabled);
@@ -69,16 +70,15 @@ export function ArrivalBoard() {
 
         <div className="flex flex-col items-center gap-1.5">
           <StationHeader stationName={TARGET_STATION_NAME} />
-          <div className="flex items-center gap-2">
-            <span className="font-[family-name:var(--font-station)] text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-zinc-400">
-              Green Line D
-            </span>
-            <span
-              className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-red-500/80"}`}
-              title={connected ? "Live" : "Disconnected"}
-              aria-label={connected ? "Connected" : "Disconnected"}
-            />
-          </div>
+          <span className="font-[family-name:var(--font-station)] text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-zinc-400">
+            Green Line · D Branch
+          </span>
+          <span
+            className={`sr-only ${connected ? "text-emerald-500" : "text-red-500/80"}`}
+            aria-live="polite"
+          >
+            {connected ? "Live data connected" : "Disconnected from live data"}
+          </span>
         </div>
 
         <div className="min-w-[2.5rem]">
@@ -132,6 +132,8 @@ export function ArrivalBoard() {
           <div className="led-text pt-1 text-[0.65rem] text-amber-700/70">{error}</div>
         )}
       </main>
+
+      <ServiceFrequency schedules={schedules} nowMs={nowMs} glow={glow} />
 
       <LeaveForStationNow visible={showLeaveNow} />
 

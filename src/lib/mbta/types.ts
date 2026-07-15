@@ -91,6 +91,8 @@ export interface Arrival {
   vehicleProgress: number;
   isDelayed: boolean;
   isApproaching: boolean;
+  /** Raw MBTA prediction status (e.g. "Approaching", "Boarding"). */
+  mbtaStatus: string | null;
   /** Distinguishes live predictions from static schedule rows. */
   rowKind?: BoardRowKind;
 }

@@ -91,6 +91,7 @@ export function deriveScheduledArrivals(
       vehicleProgress: 0,
       isDelayed: false,
       isApproaching: false,
+      mbtaStatus: null,
       rowKind: "scheduled",
     });
   }

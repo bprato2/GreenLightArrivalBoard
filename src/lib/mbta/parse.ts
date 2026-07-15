@@ -1,7 +1,7 @@
 import {
-  GREEN_D_STATIONS,
   INBOUND_DIRECTION_ID,
   MINI_MAP_MAX_STATION_INDEX,
+  MINI_MAP_STATIONS,
   resolveStation,
   resolveStationByName,
   stationIndex,
@@ -175,30 +175,86 @@ function vehicleMapPosition(
 ): { stationIndex: number; progress: number } | null {
   const directionId = vehicle.attributes.direction_id ?? 0;
   const location = describeVehicleLocation(vehicle, stops);
-  if (location.stationIndex === null) return null;
-  if (location.stationIndex > MINI_MAP_MAX_STATION_INDEX) return null;
 
   let stationIndexValue = location.stationIndex;
   let progress = location.progress;
 
+  if (stationIndexValue === null) {
+    const fromCoords = positionFromLatLon(
+      vehicle.attributes.latitude,
+      vehicle.attributes.longitude,
+    );
+    if (!fromCoords) return null;
+    stationIndexValue = fromCoords.stationIndex;
+    progress = fromCoords.progress;
+  }
+
+  if (stationIndexValue > MINI_MAP_MAX_STATION_INDEX) return null;
+
   const status = vehicle.attributes.current_status;
   if (status === "IN_TRANSIT_TO" || status === "INCOMING_AT") {
     if (directionId === 1) {
-      const prev = Math.max(0, location.stationIndex - 1);
+      const prev = Math.max(0, stationIndexValue - 1);
       stationIndexValue = prev;
       progress = status === "INCOMING_AT" ? 0.92 : 0.55;
     } else {
-      const next = Math.min(GREEN_D_STATIONS.length - 1, location.stationIndex + 1);
-      stationIndexValue = location.stationIndex;
       progress = status === "INCOMING_AT" ? 0.92 : 0.55;
-      void next;
     }
   } else if (status === "STOPPED_AT") {
-    stationIndexValue = location.stationIndex;
     progress = 0;
   }
 
   return { stationIndex: stationIndexValue, progress };
+}
+
+/** Project GPS coordinates onto the mini-map polyline. */
+function positionFromLatLon(
+  lat: number | null,
+  lon: number | null,
+): { stationIndex: number; progress: number } | null {
+  if (lat === null || lon === null) return null;
+
+  let bestDist = Infinity;
+  let bestIndex = 0;
+  let bestProgress = 0;
+
+  for (let i = 0; i < MINI_MAP_STATIONS.length - 1; i++) {
+    const a = MINI_MAP_STATIONS[i]!;
+    const b = MINI_MAP_STATIONS[i + 1]!;
+    const { t, dist } = projectPointOnSegment(lat, lon, a.lat, a.lon, b.lat, b.lon);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIndex = i;
+      bestProgress = t;
+    }
+  }
+
+  // Reject positions far from the track (~2 km).
+  if (bestDist > 0.02) return null;
+
+  return { stationIndex: bestIndex, progress: bestProgress };
+}
+
+function projectPointOnSegment(
+  lat: number,
+  lon: number,
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): { t: number; dist: number } {
+  const dx = lat2 - lat1;
+  const dy = lon2 - lon1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) {
+    const dist = Math.hypot(lat - lat1, lon - lon1);
+    return { t: 0, dist };
+  }
+  const t = Math.max(0, Math.min(1, ((lat - lat1) * dx + (lon - lon1) * dy) / lenSq));
+  const projLat = lat1 + t * dx;
+  const projLon = lon1 + t * dy;
+  const dist = Math.hypot(lat - projLat, lon - projLon);
+  return { t, dist };
 }
 
 function describeVehicleLocation(
@@ -318,6 +374,7 @@ export function deriveBoardState(
       vehicleProgress: location.progress,
       isDelayed,
       isApproaching,
+      mbtaStatus: attrs.status,
       rowKind: "live",
     });
   }
@@ -325,13 +382,17 @@ export function deriveBoardState(
   arrivals.sort((a, b) => a.etaMs - b.etaMs);
 
   const trains: MapTrain[] = [];
-  for (const vehicle of collection.vehicles.values()) {
+  const seenVehicleIds = new Set<string>();
+
+  const addTrain = (vehicle: VehicleResource) => {
+    if (seenVehicleIds.has(vehicle.id)) return;
     const directionId = vehicle.attributes.direction_id ?? 0;
-    if (directionId !== 1) continue;
+    if (directionId !== 1) return;
 
     const position = vehicleMapPosition(vehicle, collection.stops);
-    if (!position) continue;
+    if (!position) return;
 
+    seenVehicleIds.add(vehicle.id);
     trains.push({
       id: vehicle.id,
       label: vehicle.attributes.label,
@@ -340,6 +401,18 @@ export function deriveBoardState(
       progress: position.progress,
       status: vehicle.attributes.current_status,
     });
+  };
+
+  for (const vehicle of collection.vehicles.values()) {
+    addTrain(vehicle);
+  }
+
+  // Also pick up vehicles linked to live predictions (included via prediction SSE).
+  for (const prediction of collection.predictions.values()) {
+    const vehicleId = relatedId(prediction, "vehicle");
+    if (!vehicleId) continue;
+    const vehicle = collection.vehicles.get(vehicleId);
+    if (vehicle) addTrain(vehicle);
   }
 
   return { arrivals, trains };
