@@ -68,11 +68,13 @@ export interface StreamCollection {
 
 export type ArrivalStatus = "on_time" | "delayed" | "approaching" | "boarding" | "unknown";
 
+export type BoardRowKind = "live" | "scheduled";
+
 export interface Arrival {
   id: string;
   vehicleId: string | null;
   tripId: string | null;
-  /** 1 = inbound (toward Government Center), 0 = outbound (toward Riverside). */
+  /** 1 = inbound (toward Union Square / downtown), 0 = outbound (toward Riverside). */
   directionId: number;
   headsign: string;
   /** Predicted arrival / departure Instant (ms). Prefer arrival_time, else departure. */
@@ -89,7 +91,18 @@ export interface Arrival {
   vehicleProgress: number;
   isDelayed: boolean;
   isApproaching: boolean;
+  /** Distinguishes live predictions from static schedule rows. */
+  rowKind?: BoardRowKind;
 }
+
+export interface ScheduleAttributes {
+  arrival_time: string | null;
+  departure_time: string | null;
+  direction_id: number;
+  stop_sequence: number | null;
+}
+
+export type ScheduleResource = MbtaResource<ScheduleAttributes>;
 
 export interface MapTrain {
   id: string;

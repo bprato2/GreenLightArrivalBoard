@@ -39,10 +39,14 @@ export const ROUTE_ID = "Green-D";
 /** Eastbound / inbound toward downtown (Government Center / Union Square). */
 export const INBOUND_DIRECTION_ID = "1";
 
-/** Western segment shown on the mini-map (Riverside → Newton Highlands). */
-export const MINI_MAP_STATIONS: StationInfo[] = GREEN_D_STATIONS.slice(0, 5);
+/**
+ * Mini-map segment: Riverside → Newton Highlands, plus the next two inbound
+ * stops (Newton Centre, Chestnut Hill), with a continuation marker beyond.
+ */
+export const MINI_MAP_STATIONS: StationInfo[] = GREEN_D_STATIONS.slice(0, 7);
 export const MINI_MAP_MAX_STATION_INDEX =
   MINI_MAP_STATIONS[MINI_MAP_STATIONS.length - 1]!.index;
+export const MINI_MAP_HAS_CONTINUATION = true;
 
 const byId = new Map(GREEN_D_STATIONS.map((s) => [s.id, s]));
 const byName = new Map(

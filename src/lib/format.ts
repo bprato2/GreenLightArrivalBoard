@@ -12,10 +12,11 @@ export function formatClock(date: Date): { dateLine: string; timeLine: string } 
   const timeLine = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    second: "2-digit",
     hour12: true,
     timeZone: "America/New_York",
-  }).format(date);
+  })
+    .format(date)
+    .replace(/\s*(AM|PM)/i, "");
 
   return { dateLine, timeLine };
 }
@@ -24,4 +25,16 @@ export function formatMinutes(minutes: number): string {
   if (minutes <= 0) return "ARR";
   if (minutes === 1) return "1 min";
   return `${minutes} min`;
+}
+
+/** Format a scheduled time for display (e.g. "9:42"). */
+export function formatScheduledTime(etaMs: number): string {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "America/New_York",
+  })
+    .format(new Date(etaMs))
+    .replace(/\s*(AM|PM)/i, "");
 }

@@ -1,11 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Share_Tech_Mono } from "next/font/google";
+import { Barlow_Condensed, Share_Tech_Mono } from "next/font/google";
 import "./globals.css";
 
 const ledFont = Share_Tech_Mono({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-led",
+  display: "swap",
+});
+
+const stationFont = Barlow_Condensed({
+  weight: ["600", "700"],
+  subsets: ["latin"],
+  variable: "--font-station",
   display: "swap",
 });
 
@@ -37,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full bg-black">
-      <body className={`${ledFont.variable} h-full bg-black antialiased`}>
+      <body className={`${ledFont.variable} ${stationFont.variable} h-full bg-black antialiased`}>
         {children}
       </body>
     </html>

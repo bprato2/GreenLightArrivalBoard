@@ -4,6 +4,7 @@
  */
 
 let sharedCtx: AudioContext | null = null;
+let unlockPromise: Promise<void> | null = null;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -37,6 +38,16 @@ function triangleTone(
   osc.stop(start + decaySeconds + 0.05);
 }
 
+/** Play a near-silent buffer to satisfy browser autoplay policies on kiosks. */
+async function primeAudioContext(ctx: AudioContext): Promise<void> {
+  const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start(0);
+  source.stop(ctx.currentTime + 0.01);
+}
+
 /** Play the iconic two-tone MBTA chime. Resolves when both notes have finished. */
 export function playMBTAChime(): Promise<void> {
   return new Promise((resolve) => {
@@ -65,13 +76,23 @@ export function playMBTAChime(): Promise<void> {
 export const playMbtaChime = playMBTAChime;
 
 export async function unlockAudio(): Promise<void> {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  if (ctx.state === "suspended") {
+  if (unlockPromise) {
+    await unlockPromise;
+    return;
+  }
+
+  unlockPromise = (async () => {
+    const ctx = getAudioContext();
+    if (!ctx) return;
     try {
-      await ctx.resume();
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+      await primeAudioContext(ctx);
     } catch {
       /* ignore */
     }
-  }
+  })();
+
+  await unlockPromise;
 }
