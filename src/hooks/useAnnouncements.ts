@@ -92,11 +92,11 @@ export function useAnnouncements(
       const current = arrival.minutesAway;
 
       const threeKey = announcementKey(arrival, "3min");
-      const crossedThreeMinute =
-        prev !== undefined && prev > 3 && current <= 3 && current > 1;
-      const atThreeMinute = current === 3 && prev !== 3;
+      const wasAboveThree = prev === undefined || prev > 3;
       if (
-        (crossedThreeMinute || atThreeMinute) &&
+        current <= 3 &&
+        current > 1 &&
+        wasAboveThree &&
         !announcedIds.current.has(threeKey)
       ) {
         announcedIds.current.add(threeKey);
@@ -104,11 +104,10 @@ export function useAnnouncements(
       }
 
       const arrivingKey = announcementKey(arrival, "arriving");
-      const crossedArriving =
-        prev !== undefined && prev > 1 && isArrivingMilestone(arrival);
-      const atArriving = isArrivingMilestone(arrival) && prev !== undefined && prev > 1;
+      const wasAboveOne = prev === undefined || prev > 1;
       if (
-        (crossedArriving || (atArriving && current <= 1)) &&
+        isArrivingMilestone(arrival) &&
+        wasAboveOne &&
         !announcedIds.current.has(arrivingKey)
       ) {
         announcedIds.current.add(arrivingKey);
