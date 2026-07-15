@@ -1,5 +1,6 @@
 import {
   GREEN_D_STATIONS,
+  INBOUND_DIRECTION_ID,
   MINI_MAP_MAX_STATION_INDEX,
   resolveStation,
   resolveStationByName,
@@ -7,6 +8,7 @@ import {
   stationName,
   TARGET_STOP_ID,
 } from "./stations";
+import { normalizeInboundHeadsign } from "./headsign";
 import type {
   Arrival,
   ArrivalStatus,
@@ -30,6 +32,7 @@ export function buildPredictionsUrl(apiKey: string): string {
   const params = new URLSearchParams({
     "filter[stop]": TARGET_STOP_ID,
     "filter[route]": "Green-D",
+    "filter[direction_id]": INBOUND_DIRECTION_ID,
     include: "vehicle,trip,stop",
     api_key: apiKey,
   });
@@ -166,6 +169,38 @@ function parentStopId(stopId: string | null, stops: Map<string, StopResource>): 
   return parent ?? stopId;
 }
 
+function vehicleMapPosition(
+  vehicle: VehicleResource,
+  stops: Map<string, StopResource>,
+): { stationIndex: number; progress: number } | null {
+  const directionId = vehicle.attributes.direction_id ?? 0;
+  const location = describeVehicleLocation(vehicle, stops);
+  if (location.stationIndex === null) return null;
+  if (location.stationIndex > MINI_MAP_MAX_STATION_INDEX) return null;
+
+  let stationIndexValue = location.stationIndex;
+  let progress = location.progress;
+
+  const status = vehicle.attributes.current_status;
+  if (status === "IN_TRANSIT_TO" || status === "INCOMING_AT") {
+    if (directionId === 1) {
+      const prev = Math.max(0, location.stationIndex - 1);
+      stationIndexValue = prev;
+      progress = status === "INCOMING_AT" ? 0.92 : 0.55;
+    } else {
+      const next = Math.min(GREEN_D_STATIONS.length - 1, location.stationIndex + 1);
+      stationIndexValue = location.stationIndex;
+      progress = status === "INCOMING_AT" ? 0.92 : 0.55;
+      void next;
+    }
+  } else if (status === "STOPPED_AT") {
+    stationIndexValue = location.stationIndex;
+    progress = 0;
+  }
+
+  return { stationIndex: stationIndexValue, progress };
+}
+
 function describeVehicleLocation(
   vehicle: VehicleResource | undefined,
   stops: Map<string, StopResource>,
@@ -260,13 +295,13 @@ export function deriveBoardState(
     );
 
     const location = describeVehicleLocation(vehicle, collection.stops);
-    const headsign =
-      trip?.attributes.headsign ||
-      attrs.status ||
-      "Government Center";
-
     const directionId =
       trip?.attributes.direction_id ?? attrs.direction_id ?? 0;
+    if (directionId !== 1) continue;
+
+    const headsign = normalizeInboundHeadsign(
+      trip?.attributes.headsign || attrs.status || "Union Square",
+    );
 
     arrivals.push({
       id: prediction.id,
@@ -283,6 +318,7 @@ export function deriveBoardState(
       vehicleProgress: location.progress,
       isDelayed,
       isApproaching,
+      rowKind: "live",
     });
   }
 
@@ -291,45 +327,17 @@ export function deriveBoardState(
   const trains: MapTrain[] = [];
   for (const vehicle of collection.vehicles.values()) {
     const directionId = vehicle.attributes.direction_id ?? 0;
-    const location = describeVehicleLocation(vehicle, collection.stops);
-    if (location.stationIndex === null) continue;
-    // Mini-map covers Riverside → Newton Highlands only.
-    if (location.stationIndex > MINI_MAP_MAX_STATION_INDEX) continue;
+    if (directionId !== 1) continue;
 
-    // For IN_TRANSIT_TO / INCOMING_AT, map position sits between previous and current.
-    let stationIndexValue = location.stationIndex;
-    let progress = location.progress;
-
-    if (
-      vehicle.attributes.current_status === "IN_TRANSIT_TO" ||
-      vehicle.attributes.current_status === "INCOMING_AT"
-    ) {
-      const prev =
-        directionId === 1
-          ? Math.max(0, location.stationIndex - 1)
-          : Math.min(GREEN_D_STATIONS.length - 1, location.stationIndex + 1);
-      stationIndexValue = Math.min(prev, location.stationIndex);
-      const span = Math.abs(location.stationIndex - prev) || 1;
-      progress =
-        vehicle.attributes.current_status === "INCOMING_AT"
-          ? 0.9
-          : 0.4;
-      // Normalize so index is the western (lower) end of the segment for direction 1
-      if (directionId === 1) {
-        stationIndexValue = prev;
-      } else {
-        stationIndexValue = location.stationIndex;
-        progress = 1 - progress;
-      }
-      void span;
-    }
+    const position = vehicleMapPosition(vehicle, collection.stops);
+    if (!position) continue;
 
     trains.push({
       id: vehicle.id,
       label: vehicle.attributes.label,
       directionId,
-      stationIndex: stationIndexValue,
-      progress,
+      stationIndex: position.stationIndex,
+      progress: position.progress,
       status: vehicle.attributes.current_status,
     });
   }

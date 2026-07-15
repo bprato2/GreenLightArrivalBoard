@@ -1,7 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { formatMinutes } from "@/lib/format";
+import { MarqueeText } from "@/components/MarqueeText";
+import { formatMinutes, formatScheduledTime } from "@/lib/format";
+import { formatMbtaHeadsign } from "@/lib/mbta/headsign";
 import type { Arrival } from "@/lib/mbta/types";
 
 interface ArrivalRowProps {
@@ -11,9 +13,13 @@ interface ArrivalRowProps {
 }
 
 export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
-  const eta = formatMinutes(arrival.minutesAway);
+  const isScheduled = arrival.rowKind === "scheduled";
+  const eta = isScheduled
+    ? formatScheduledTime(arrival.etaMs)
+    : formatMinutes(arrival.minutesAway);
   const glowPx = 4 + glow * 14;
-  const directionLabel = arrival.directionId === 1 ? "INB" : "OUT";
+  const headsign = formatMbtaHeadsign(arrival.headsign);
+  const primaryText = `INB, ${headsign}`;
 
   return (
     <motion.div
@@ -25,46 +31,49 @@ export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
       className="arrival-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-amber-900/25 py-2.5 px-1"
     >
       <div className="min-w-0">
-        <div className="flex items-baseline gap-3">
-          <span
-            className="led-text text-[clamp(1.1rem,2.4vw,1.85rem)] font-semibold tracking-wide truncate"
+        {isScheduled && (
+          <div className="led-text mb-0.5 text-[0.6rem] uppercase tracking-[0.28em] text-amber-600/70">
+            Next scheduled
+          </div>
+        )}
+        <div className="flex min-w-0 items-baseline gap-3">
+          <MarqueeText
+            className="led-text min-w-0 flex-1 text-[clamp(1.1rem,2.4vw,1.85rem)] font-semibold tracking-wide"
             style={{ textShadow: `0 0 ${glowPx}px rgba(255,176,0,${0.35 + glow * 0.45})` }}
           >
-            <span className="text-amber-500/90">{directionLabel}</span>
-            <span className="mx-2 text-amber-700/60">•</span>
-            {arrival.headsign}
-          </span>
-          {arrival.isDelayed && (
-            <span className="led-text text-xs uppercase tracking-[0.2em] text-orange-400/90 shrink-0">
+            {primaryText}
+          </MarqueeText>
+          {!isScheduled && arrival.isDelayed && (
+            <span className="led-text shrink-0 text-xs uppercase tracking-[0.2em] text-orange-400/90">
               Delayed
             </span>
           )}
-          {arrival.isApproaching && !arrival.isDelayed && (
-            <span className="led-text text-xs uppercase tracking-[0.2em] text-emerald-400/90 shrink-0 animate-pulse">
+          {!isScheduled && arrival.isApproaching && !arrival.isDelayed && (
+            <span className="led-text shrink-0 text-xs uppercase tracking-[0.2em] text-emerald-400/90 animate-pulse">
               Approaching
             </span>
           )}
         </div>
-        {arrival.locationLabel && (
-          <div
-            className="led-text mt-0.5 text-[clamp(0.75rem,1.4vw,1rem)] text-amber-500/70 truncate"
+        {!isScheduled && arrival.locationLabel && (
+          <MarqueeText
+            className="led-text mt-0.5 min-w-0 text-[clamp(0.75rem,1.4vw,1rem)] text-amber-500/70"
             style={{ textShadow: `0 0 ${glowPx * 0.5}px rgba(255,176,0,0.25)` }}
           >
             {arrival.locationLabel}
-          </div>
+          </MarqueeText>
         )}
       </div>
 
-      <div className="text-right shrink-0">
+      <div className="shrink-0 text-right">
         <div
           className={`led-text tabular-nums font-bold tracking-wider ${
-            arrival.minutesAway <= 0
-              ? "text-emerald-400 text-[clamp(1.4rem,3vw,2.2rem)]"
+            !isScheduled && arrival.minutesAway <= 0
+              ? "text-[clamp(1.4rem,3vw,2.2rem)] text-emerald-400"
               : "text-[clamp(1.35rem,2.8vw,2.1rem)]"
-          }`}
+          } ${isScheduled ? "text-amber-400/90" : ""}`}
           style={{
             textShadow:
-              arrival.minutesAway <= 0
+              !isScheduled && arrival.minutesAway <= 0
                 ? `0 0 ${glowPx}px rgba(52,211,153,${0.5 + glow * 0.4})`
                 : `0 0 ${glowPx}px rgba(255,176,0,${0.4 + glow * 0.4})`,
           }}

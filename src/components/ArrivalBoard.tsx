@@ -3,27 +3,38 @@
 import type { CSSProperties } from "react";
 import { AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { ArrivalIndicator } from "@/components/ArrivalIndicator";
 import { ArrivalRow } from "@/components/ArrivalRow";
 import { AnnouncementManager } from "@/components/AnnouncementManager";
+import { LeaveForStationNow } from "@/components/LeaveForStationNow";
 import { MiniMap } from "@/components/MiniMap";
+import { StationHeader } from "@/components/StationHeader";
 import { Weather } from "@/components/Weather";
 import { useAnnouncements } from "@/hooks/useAnnouncements";
-import { useArrivalAlert } from "@/hooks/useArrivalAlert";
 import { useClock } from "@/hooks/useClock";
+import { useMbtaSchedules } from "@/hooks/useMbtaSchedules";
 import { useMbtaStream } from "@/hooks/useMbtaStream";
 import { useSettings } from "@/hooks/useSettings";
 import { useWeather } from "@/hooks/useWeather";
 import { TARGET_STATION_NAME } from "@/lib/mbta/stations";
+import type { Arrival } from "@/lib/mbta/types";
+
+function mergeBoardRows(live: Arrival[], scheduled: Arrival[]): Arrival[] {
+  return [...live, ...scheduled];
+}
 
 export function ArrivalBoard() {
   const { settings, hydrated } = useSettings();
-  const { arrivals, trains, connected, error } = useMbtaStream();
+  const { arrivals, trains, connected, error, nowMs } = useMbtaStream();
+  const scheduled = useMbtaSchedules(arrivals, nowMs);
+  const boardRows = mergeBoardRows(arrivals, scheduled);
   const { timeLine } = useClock();
   const weather = useWeather(settings.weatherEnabled);
-  const closestInbound =
-    arrivals.find((a) => a.directionId === 1)?.minutesAway ?? null;
-  const alert = useArrivalAlert(closestInbound, settings);
+  const closestInbound = arrivals[0]?.minutesAway ?? null;
+  const showLeaveNow =
+    closestInbound !== null &&
+    closestInbound >= settings.alertPulseMinMinutes &&
+    closestInbound <= settings.alertPulseMaxMinutes;
+
   useAnnouncements(arrivals, settings.announcementsEnabled);
 
   const glow = settings.ledGlowIntensity;
@@ -48,7 +59,6 @@ export function ArrivalBoard() {
       <div className="led-scanlines pointer-events-none absolute inset-0 z-20" aria-hidden />
       <div className="led-vignette pointer-events-none absolute inset-0 z-10" aria-hidden />
 
-      {/* Header ~ compact */}
       <header className="relative z-30 flex shrink-0 items-center justify-between gap-4 px-5 pt-3 pb-1">
         <div
           className="led-text text-[clamp(1.35rem,2.8vw,2.1rem)] tabular-nums tracking-wider"
@@ -57,44 +67,37 @@ export function ArrivalBoard() {
           {timeLine}
         </div>
 
-        <div className="flex flex-col items-center gap-2">
-          <div
-            className="led-text text-center text-[clamp(1.4rem,3.2vw,2.4rem)] font-semibold uppercase tracking-[0.18em]"
-            style={{ textShadow: `0 0 ${8 + glow * 16}px rgba(255,176,0,${0.45 + glow * 0.4})` }}
-          >
-            {TARGET_STATION_NAME}
-          </div>
-          <div className="flex items-center gap-3">
-            <ArrivalIndicator phase={alert.phase} />
-            <span className="led-text text-[0.65rem] uppercase tracking-[0.25em] text-amber-600/80">
+        <div className="flex flex-col items-center gap-1.5">
+          <StationHeader stationName={TARGET_STATION_NAME} />
+          <div className="flex items-center gap-2">
+            <span className="font-[family-name:var(--font-station)] text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-zinc-400">
               Green Line D
             </span>
             <span
-              className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-red-500/80"}`}
+              className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-red-500/80"}`}
               title={connected ? "Live" : "Disconnected"}
               aria-label={connected ? "Connected" : "Disconnected"}
             />
           </div>
         </div>
 
-        <div className="min-w-[7rem]">
+        <div className="min-w-[2.5rem]">
           {settings.weatherEnabled ? (
             <Weather data={weather.data} error={weather.error} glow={glow} />
           ) : (
-            <div className="h-10" />
+            <div className="h-8" />
           )}
         </div>
       </header>
 
-      {/* Arrivals — fills remaining space above mini-map */}
       <main
         className={`relative z-30 flex min-h-0 flex-1 flex-col px-5 ${
-          settings.miniMapEnabled ? "pb-1" : "pb-4"
+          settings.miniMapEnabled ? "pb-1" : "pb-2"
         }`}
       >
         <div className="mb-1 flex items-end justify-between border-b border-amber-900/40 pb-1">
           <span className="led-text text-[0.7rem] uppercase tracking-[0.3em] text-amber-600/75">
-            Next arrivals
+            Inbound arrivals
           </span>
           <Link
             href="/settings"
@@ -105,16 +108,16 @@ export function ArrivalBoard() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-hidden">
-          {error && arrivals.length === 0 && (
+          {error && boardRows.length === 0 && (
             <div className="led-text py-8 text-center text-amber-600/90">{error}</div>
           )}
-          {!error && arrivals.length === 0 && (
+          {!error && boardRows.length === 0 && (
             <div className="led-text py-8 text-center text-amber-700/70">
               Waiting for predictions…
             </div>
           )}
           <AnimatePresence initial={false}>
-            {arrivals.slice(0, 6).map((arrival, index) => (
+            {boardRows.map((arrival, index) => (
               <ArrivalRow
                 key={arrival.id}
                 arrival={arrival}
@@ -125,10 +128,12 @@ export function ArrivalBoard() {
           </AnimatePresence>
         </div>
 
-        {error && arrivals.length > 0 && (
+        {error && boardRows.length > 0 && (
           <div className="led-text pt-1 text-[0.65rem] text-amber-700/70">{error}</div>
         )}
       </main>
+
+      <LeaveForStationNow visible={showLeaveNow} />
 
       {settings.miniMapEnabled && (
         <section className="relative z-30 h-[20vh] min-h-[120px] max-h-[180px] shrink-0 border-t border-amber-900/30 bg-gradient-to-b from-transparent to-emerald-950/20">

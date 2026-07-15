@@ -99,11 +99,54 @@ body:has([data-allow-scroll="true"]) {
   animation: train-glow 2.4s ease-in-out infinite;
 }
 
+@keyframes leave-now-blink {
+  0%,
+  100% {
+    background-color: rgba(6, 78, 59, 0.75);
+    box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.25);
+  }
+  50% {
+    background-color: rgba(16, 185, 129, 0.35);
+    box-shadow: inset 0 0 18px rgba(52, 211, 153, 0.45);
+  }
+}
+
+.animate-leave-now-blink {
+  animation: leave-now-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll linear infinite;
+}
+
+.station-header {
+  background: #000;
+}
+
+.station-name {
+  text-shadow: none;
+}
+
+.green-line-bullet {
+  box-shadow: none;
+}
+
 /* Prefer reduced motion on accessibility request — keep kiosk calm if needed */
 @media (prefers-reduced-motion: reduce) {
   .animate-alert-pulse,
   .animate-train-glow,
-  .animate-pulse {
+  .animate-pulse,
+  .animate-leave-now-blink,
+  .marquee-track {
     animation: none !important;
   }
 }

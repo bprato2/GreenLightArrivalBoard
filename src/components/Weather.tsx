@@ -9,30 +9,26 @@ interface WeatherProps {
   glow: number;
 }
 
+/** Compact weather corner — icon only, no temperature or condition text. */
 export function Weather({ data, error, glow }: WeatherProps) {
   const glowPx = 3 + glow * 10;
   const meta = data ? weatherIcon(data.weatherCode, data.isDay) : null;
 
   return (
     <div
-      className="weather-widget led-text text-right leading-tight"
-      style={{ textShadow: `0 0 ${glowPx}px rgba(255,176,0,${0.3 + glow * 0.4})` }}
-      aria-label="Current weather"
+      className="weather-widget flex items-center justify-end"
+      aria-label={meta ? `Current weather: ${meta.label}` : "Current weather"}
     >
       {data && meta ? (
-        <>
-          <div className="text-[clamp(1.1rem,2.2vw,1.6rem)] tabular-nums">
-            <span className="mr-2 opacity-90" aria-hidden>
-              {meta.icon}
-            </span>
-            {data.temperatureF}°F
-          </div>
-          <div className="text-[0.7rem] uppercase tracking-[0.18em] text-amber-500/65">
-            {meta.label}
-          </div>
-        </>
+        <span
+          className="led-text text-[clamp(1.4rem,2.8vw,2rem)] leading-none opacity-90"
+          style={{ textShadow: `0 0 ${glowPx}px rgba(255,176,0,${0.3 + glow * 0.4})` }}
+          aria-hidden
+        >
+          {meta.icon}
+        </span>
       ) : (
-        <div className="text-sm text-amber-700/70">{error ?? "…"}</div>
+        <span className="led-text text-sm text-amber-700/70">{error ?? "…"}</span>
       )}
     </div>
   );
