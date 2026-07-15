@@ -8,29 +8,32 @@ export interface StationInfo {
   shortName: string;
   /** Index along the D branch (0 = Riverside). */
   index: number;
+  /** Approximate coordinates for map interpolation. */
+  lat: number;
+  lon: number;
 }
 
 export const GREEN_D_STATIONS: StationInfo[] = [
-  { id: "place-river", name: "Riverside", shortName: "Riverside", index: 0 },
-  { id: "place-woodl", name: "Woodland", shortName: "Woodland", index: 1 },
-  { id: "place-waban", name: "Waban", shortName: "Waban", index: 2 },
-  { id: "place-eliot", name: "Eliot", shortName: "Eliot", index: 3 },
-  { id: "place-newtn", name: "Newton Highlands", shortName: "N. Highlands", index: 4 },
-  { id: "place-newto", name: "Newton Centre", shortName: "N. Centre", index: 5 },
-  { id: "place-chhil", name: "Chestnut Hill", shortName: "Chestnut Hl", index: 6 },
-  { id: "place-rsmnl", name: "Reservoir", shortName: "Reservoir", index: 7 },
-  { id: "place-bcnfd", name: "Beaconsfield", shortName: "Beaconsfld", index: 8 },
-  { id: "place-brkhl", name: "Brookline Hills", shortName: "Brk Hills", index: 9 },
-  { id: "place-bvmnl", name: "Brookline Village", shortName: "Brk Village", index: 10 },
-  { id: "place-longw", name: "Longwood", shortName: "Longwood", index: 11 },
-  { id: "place-fenwy", name: "Fenway", shortName: "Fenway", index: 12 },
-  { id: "place-kencl", name: "Kenmore", shortName: "Kenmore", index: 13 },
-  { id: "place-hymnl", name: "Hynes Convention Center", shortName: "Hynes", index: 14 },
-  { id: "place-coecl", name: "Copley", shortName: "Copley", index: 15 },
-  { id: "place-armnl", name: "Arlington", shortName: "Arlington", index: 16 },
-  { id: "place-boyls", name: "Boylston", shortName: "Boylston", index: 17 },
-  { id: "place-pktrm", name: "Park Street", shortName: "Park St", index: 18 },
-  { id: "place-gover", name: "Government Center", shortName: "Gov Ctr", index: 19 },
+  { id: "place-river", name: "Riverside", shortName: "Riverside", index: 0, lat: 42.337, lon: -71.2527 },
+  { id: "place-woodl", name: "Woodland", shortName: "Woodland", index: 1, lat: 42.333, lon: -71.2445 },
+  { id: "place-waban", name: "Waban", shortName: "Waban", index: 2, lat: 42.3259, lon: -71.2304 },
+  { id: "place-eliot", name: "Eliot", shortName: "Eliot", index: 3, lat: 42.319, lon: -71.2165 },
+  { id: "place-newtn", name: "Newton Highlands", shortName: "N. Highlands", index: 4, lat: 42.3222, lon: -71.2054 },
+  { id: "place-newto", name: "Newton Centre", shortName: "N. Centre", index: 5, lat: 42.3297, lon: -71.1926 },
+  { id: "place-chhil", name: "Chestnut Hill", shortName: "Chestnut Hl", index: 6, lat: 42.3368, lon: -71.1647 },
+  { id: "place-rsmnl", name: "Reservoir", shortName: "Reservoir", index: 7, lat: 42.3351, lon: -71.1486 },
+  { id: "place-bcnfd", name: "Beaconsfield", shortName: "Beaconsfld", index: 8, lat: 42.3357, lon: -71.1403 },
+  { id: "place-brkhl", name: "Brookline Hills", shortName: "Brk Hills", index: 9, lat: 42.3313, lon: -71.1267 },
+  { id: "place-bvmnl", name: "Brookline Village", shortName: "Brk Village", index: 10, lat: 42.3326, lon: -71.1165 },
+  { id: "place-longw", name: "Longwood", shortName: "Longwood", index: 11, lat: 42.3417, lon: -71.1097 },
+  { id: "place-fenwy", name: "Fenway", shortName: "Fenway", index: 12, lat: 42.3454, lon: -71.1043 },
+  { id: "place-kencl", name: "Kenmore", shortName: "Kenmore", index: 13, lat: 42.3489, lon: -71.0952 },
+  { id: "place-hymnl", name: "Hynes Convention Center", shortName: "Hynes", index: 14, lat: 42.3479, lon: -71.0879 },
+  { id: "place-coecl", name: "Copley", shortName: "Copley", index: 15, lat: 42.3499, lon: -71.0774 },
+  { id: "place-armnl", name: "Arlington", shortName: "Arlington", index: 16, lat: 42.3517, lon: -71.0709 },
+  { id: "place-boyls", name: "Boylston", shortName: "Boylston", index: 17, lat: 42.353, lon: -71.0646 },
+  { id: "place-pktrm", name: "Park Street", shortName: "Park St", index: 18, lat: 42.3564, lon: -71.0624 },
+  { id: "place-gover", name: "Government Center", shortName: "Gov Ctr", index: 19, lat: 42.3597, lon: -71.0592 },
 ];
 
 export const TARGET_STOP_ID = "place-newtn";

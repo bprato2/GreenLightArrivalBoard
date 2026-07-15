@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { MarqueeText } from "@/components/MarqueeText";
-import { formatMinutes, formatScheduledTime } from "@/lib/format";
+import { formatArrivalDisplay, isStatusDisplay } from "@/lib/format";
 import { formatMbtaHeadsign } from "@/lib/mbta/headsign";
 import type { Arrival } from "@/lib/mbta/types";
 
@@ -14,12 +14,10 @@ interface ArrivalRowProps {
 
 export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
   const isScheduled = arrival.rowKind === "scheduled";
-  const eta = isScheduled
-    ? formatScheduledTime(arrival.etaMs)
-    : formatMinutes(arrival.minutesAway);
+  const eta = formatArrivalDisplay(arrival);
+  const showStatusStyle = !isScheduled && isStatusDisplay(eta);
   const glowPx = 4 + glow * 14;
   const headsign = formatMbtaHeadsign(arrival.headsign);
-  const primaryText = `INB, ${headsign}`;
 
   return (
     <motion.div
@@ -41,16 +39,11 @@ export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
             className="led-text min-w-0 flex-1 text-[clamp(1.1rem,2.4vw,1.85rem)] font-semibold tracking-wide"
             style={{ textShadow: `0 0 ${glowPx}px rgba(255,176,0,${0.35 + glow * 0.45})` }}
           >
-            {primaryText}
+            {headsign}
           </MarqueeText>
           {!isScheduled && arrival.isDelayed && (
             <span className="led-text shrink-0 text-xs uppercase tracking-[0.2em] text-orange-400/90">
               Delayed
-            </span>
-          )}
-          {!isScheduled && arrival.isApproaching && !arrival.isDelayed && (
-            <span className="led-text shrink-0 text-xs uppercase tracking-[0.2em] text-emerald-400/90 animate-pulse">
-              Approaching
             </span>
           )}
         </div>
@@ -67,13 +60,15 @@ export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
       <div className="shrink-0 text-right">
         <div
           className={`led-text tabular-nums font-bold tracking-wider ${
-            !isScheduled && arrival.minutesAway <= 0
-              ? "text-[clamp(1.4rem,3vw,2.2rem)] text-emerald-400"
-              : "text-[clamp(1.35rem,2.8vw,2.1rem)]"
+            showStatusStyle
+              ? "text-[clamp(1rem,2.2vw,1.6rem)] text-emerald-400 animate-pulse"
+              : !isScheduled && arrival.minutesAway <= 0
+                ? "text-[clamp(1.4rem,3vw,2.2rem)] text-emerald-400"
+                : "text-[clamp(1.35rem,2.8vw,2.1rem)]"
           } ${isScheduled ? "text-amber-400/90" : ""}`}
           style={{
             textShadow:
-              !isScheduled && arrival.minutesAway <= 0
+              showStatusStyle || (!isScheduled && arrival.minutesAway <= 0)
                 ? `0 0 ${glowPx}px rgba(52,211,153,${0.5 + glow * 0.4})`
                 : `0 0 ${glowPx}px rgba(255,176,0,${0.4 + glow * 0.4})`,
           }}

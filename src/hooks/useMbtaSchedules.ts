@@ -3,19 +3,25 @@
 import { useEffect, useRef, useState } from "react";
 import {
   deriveScheduledArrivals,
-  fetchInboundSchedules,
 } from "@/lib/mbta/schedules";
 import { getApiKey } from "@/lib/mbta/parse";
+import { getInboundSchedules } from "@/lib/mbta/scheduleCache";
 import type { Arrival, ScheduleResource } from "@/lib/mbta/types";
 
 const REFRESH_MS = 5 * 60 * 1000;
+
+export interface UseMbtaSchedulesResult {
+  scheduled: Arrival[];
+  schedules: ScheduleResource[];
+}
 
 /**
  * Polls MBTA schedules for the next inbound departures at Newton Highlands.
  * Refreshes every 5 minutes; rows are merged with live predictions in the board.
  */
-export function useMbtaSchedules(liveArrivals: Arrival[], nowMs: number): Arrival[] {
+export function useMbtaSchedules(liveArrivals: Arrival[], nowMs: number): UseMbtaSchedulesResult {
   const [scheduled, setScheduled] = useState<Arrival[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleResource[]>([]);
   const tripsRef = useRef(new Map<string, { headsign: string }>());
   const schedulesRef = useRef<ScheduleResource[]>([]);
   const liveRef = useRef(liveArrivals);
@@ -30,10 +36,11 @@ export function useMbtaSchedules(liveArrivals: Arrival[], nowMs: number): Arriva
 
     const load = async () => {
       try {
-        const result = await fetchInboundSchedules(apiKey);
+        const result = await getInboundSchedules(apiKey);
         if (cancelled) return;
         tripsRef.current = result.trips;
         schedulesRef.current = result.schedules;
+        setSchedules(result.schedules);
         setScheduled(
           deriveScheduledArrivals(
             result.schedules,
@@ -68,5 +75,5 @@ export function useMbtaSchedules(liveArrivals: Arrival[], nowMs: number): Arriva
     );
   }, [liveArrivals, nowMs]);
 
-  return scheduled;
+  return { scheduled, schedules };
 }
