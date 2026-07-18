@@ -4,7 +4,11 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { createAlertAdapter } from "@/lib/alerts/beacon";
 import { playMbtaChime, unlockAudio } from "@/lib/audio/chime";
-import { buildArrivalAnnouncement, speakAnnouncement } from "@/lib/audio/speech";
+import {
+  buildArrivalAnnouncement,
+  speakAnnouncement,
+  unlockSpeechSynthesis,
+} from "@/lib/audio/speech";
 import { useSettings } from "@/hooks/useSettings";
 import { TARGET_STATION_NAME, TARGET_STOP_ID } from "@/lib/mbta/stations";
 import type { BoardSettings } from "@/types/settings";
@@ -87,6 +91,7 @@ export function SettingsForm() {
 
   const testAnnouncement = async () => {
     setTestStatus("Playing chime + speech…");
+    unlockSpeechSynthesis();
     await unlockAudio();
     await playMbtaChime();
     await new Promise((r) => setTimeout(r, 400));

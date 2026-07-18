@@ -36,7 +36,10 @@ export function ArrivalBoard() {
     closestInbound >= settings.alertPulseMinMinutes &&
     closestInbound <= settings.alertPulseMaxMinutes;
 
-  useAnnouncements(arrivals, settings.announcementsEnabled);
+  const { needsGesture, enableFromGesture } = useAnnouncements(
+    arrivals,
+    settings.announcementsEnabled,
+  );
 
   const glow = settings.ledGlowIntensity;
 
@@ -143,7 +146,11 @@ export function ArrivalBoard() {
         </section>
       )}
 
-      <AnnouncementManager active={settings.announcementsEnabled} />
+      <AnnouncementManager
+        active={settings.announcementsEnabled}
+        needsGesture={needsGesture}
+        onEnable={enableFromGesture}
+      />
     </div>
   );
 }
