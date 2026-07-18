@@ -8,7 +8,7 @@ import { AmtrakPanel } from "@/components/AmtrakPanel";
 import { AnnouncementManager } from "@/components/AnnouncementManager";
 import { AppChrome } from "@/components/AppChrome";
 import { ArrivalRow } from "@/components/ArrivalRow";
-import { BoardRouteControls } from "@/components/BoardRouteControls";
+import { BoardRouteControls, DirectionSelect } from "@/components/BoardRouteControls";
 import { LeaveForStationNow } from "@/components/LeaveForStationNow";
 import { MiniMap } from "@/components/MiniMap";
 import { ServiceFrequency } from "@/components/ServiceFrequency";
@@ -23,8 +23,8 @@ import { useMbtaStream } from "@/hooks/useMbtaStream";
 import { useSettings } from "@/hooks/useSettings";
 import { useWalkToStation } from "@/hooks/useWalkToStation";
 import { useWeather } from "@/hooks/useWeather";
-import { ROUTE_ID, getDirectionOption } from "@/lib/mbta/boardConfig";
-import { stationDisplayName } from "@/lib/mbta/stations";
+import { ROUTE_ID, getDirectionOption, isGreenLineRoute } from "@/lib/mbta/boardConfig";
+import { resolveStation, stationDisplayName } from "@/lib/mbta/stations";
 import { getLeaveAdvice } from "@/lib/walk";
 import type { Arrival } from "@/lib/mbta/types";
 import type { TransitMode } from "@/lib/providers/types";
@@ -37,7 +37,10 @@ export function ArrivalBoard() {
   const router = useRouter();
   const { settings, setSettings, hydrated } = useSettings();
   const isAmtrak = settings.mode === "amtrak";
-  const isGreenD = settings.routeId === ROUTE_ID;
+  const showMiniMap =
+    settings.miniMapEnabled &&
+    isGreenLineRoute(settings.routeId) &&
+    Boolean(resolveStation(settings.stopId));
   const filter = {
     stopId: settings.stopId,
     directionId: settings.directionId,
@@ -178,24 +181,32 @@ useArrivalAlert(closestMinutes, settings);
             </div>
           </header>
 
-          <div className="relative z-30 flex shrink-0 items-center justify-between gap-3 border-b border-amber-900/30 px-5 pb-2">
+          <div className="relative z-30 flex shrink-0 items-end justify-between gap-3 border-b border-amber-900/30 px-5 pb-2">
             <BoardRouteControls
               settings={settings}
               compact
               hideMode
+              hideDirection
               onChange={(patch) => setSettings({ ...settings, ...patch })}
             />
-            <div className="flex shrink-0 items-center gap-2">
-              {settings.stopId && (
-                <WalkToStation
-                  stationId={settings.stopId}
-                  stationName={settings.stopName}
-                  walk={walk}
+            <div className="flex shrink-0 items-end gap-2">
+              <div className="flex min-w-[7rem] flex-col gap-1">
+                <DirectionSelect
+                  settings={settings}
+                  compact
+                  onChange={(patch) => setSettings({ ...settings, ...patch })}
                 />
-              )}
+                {settings.stopId && (
+                  <WalkToStation
+                    stationId={settings.stopId}
+                    stationName={settings.stopName}
+                    walk={walk}
+                  />
+                )}
+              </div>
               <Link
                 href="/settings"
-                className="led-text shrink-0 text-[0.65rem] uppercase tracking-[0.2em] text-amber-800/80 hover:text-amber-500"
+                className="led-text shrink-0 self-end pb-1.5 text-[0.65rem] uppercase tracking-[0.2em] text-amber-800/80 hover:text-amber-500"
               >
                 Settings
               </Link>
@@ -204,7 +215,7 @@ useArrivalAlert(closestMinutes, settings);
 
           <main
             className={`relative z-30 flex min-h-0 flex-1 flex-col px-5 ${
-              settings.miniMapEnabled && isGreenD ? "pb-1" : "pb-2"
+              showMiniMap ? "pb-1" : "pb-2"
             }`}
           >
             <div className="mb-1 flex items-end justify-between border-b border-amber-900/40 pb-1">
@@ -250,7 +261,7 @@ useArrivalAlert(closestMinutes, settings);
 
           <LeaveForStationNow advice={leaveAdvice} />
 
-          {settings.miniMapEnabled && isGreenD && (
+          {showMiniMap && (
             <section className="relative z-30 h-[22vh] min-h-[132px] max-h-[200px] shrink-0 border-t border-amber-900/30 bg-gradient-to-b from-transparent to-emerald-950/20">
               <MiniMap
                 trains={trains}

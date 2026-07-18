@@ -7,8 +7,8 @@ interface LeaveForStationNowProps {
 }
 
 /**
- * Bottom banner:
- * - leave: next catchable train is within walk time (+ early buffer)
+ * Bottom banner (walk-based, not fixed 3–7 min alert settings):
+ * - leave: walking would leave ≥1 min spare and the train is in the leave window
  * - missed: soonest train is already too close given walk time
  */
 export function LeaveForStationNow({ advice }: LeaveForStationNowProps) {

@@ -55,33 +55,45 @@ export function formatWalkDistance(miles: number): string {
   return `${Math.round(miles)} mi`;
 }
 
-/** Prompt a bit before walk time so you can grab keys / leave the building. */
+/**
+ * How many minutes before the spare-deadline to start prompting leave-now
+ * (time to grab keys / exit the building).
+ */
 export const LEAVE_EARLY_BUFFER_MINUTES = 2;
+/** Need at least this many minutes after walking before the train to leave now. */
+export const LEAVE_MIN_SPARE_MINUTES = 1;
 
 export type LeaveAdvice =
   | { kind: "idle" }
   /** Next train is already closer than walk time — skip it; wait for a later one. */
   | { kind: "missed"; trainMinutesAway: number; shortfallMinutes: number }
-  /** Next catchable train is within the leave window. */
+  /** Next catchable train is within the leave window (walk-based, ≥1 min spare). */
   | { kind: "leave"; trainMinutesAway: number };
 
 /**
  * Advise whether to leave for a catchable train, or that the soonest one is already
- * unreachable given walking time. Leave-now only fires for a train you can still make.
+ * unreachable given walking time. Leave-now is driven by walk time (not fixed 3–7 min
+ * alert settings): it only fires when walking would leave at least one minute to spare,
+ * and the train is still close enough that you should go now.
  */
 export function getLeaveAdvice(
   trainMinutesList: number[],
   walkMinutes: number | null,
   earlyBufferMinutes = LEAVE_EARLY_BUFFER_MINUTES,
+  minSpareMinutes = LEAVE_MIN_SPARE_MINUTES,
 ): LeaveAdvice {
   if (walkMinutes === null || walkMinutes <= 0) return { kind: "idle" };
   if (trainMinutesList.length === 0) return { kind: "idle" };
 
-  const catchableMinutes = trainMinutesList.find((mins) => mins >= walkMinutes);
+  // Latest moment to leave and still have minSpare minutes after arriving on foot.
+  const leaveDeadline = walkMinutes + minSpareMinutes;
+  // Start prompting this many minutes before that deadline.
+  const leavePromptFrom = leaveDeadline + earlyBufferMinutes;
+  const catchableMinutes = trainMinutesList.find((mins) => mins >= leaveDeadline);
 
   if (
     catchableMinutes !== undefined &&
-    catchableMinutes <= walkMinutes + earlyBufferMinutes
+    catchableMinutes <= leavePromptFrom
   ) {
     return { kind: "leave", trainMinutesAway: catchableMinutes };
   }

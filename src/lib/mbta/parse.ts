@@ -1,4 +1,10 @@
-import { GREEN_LINE_COLOR, ROUTE_ID, type DirectionId } from "./boardConfig";
+import {
+  GREEN_LINE_COLOR,
+  ROUTE_ID,
+  expandRouteFilter,
+  isGreenLineRoute,
+  type DirectionId,
+} from "./boardConfig";
 import {
   getMiniMapCorridor,
   resolveStation,
@@ -44,7 +50,7 @@ export function buildPredictionsUrl(
 ): string {
   const params = new URLSearchParams({
     "filter[stop]": filter.stopId,
-    "filter[route]": filter.routeId,
+    "filter[route]": expandRouteFilter(filter.routeId),
     "filter[direction_id]": String(filter.directionId),
     include: "vehicle,trip,stop",
     api_key: apiKey,
@@ -54,7 +60,7 @@ export function buildPredictionsUrl(
 
 export function buildVehiclesUrl(apiKey: string, routeId: string = ROUTE_ID): string {
   const params = new URLSearchParams({
-    "filter[route]": routeId,
+    "filter[route]": expandRouteFilter(routeId),
     include: "stop,trip",
     api_key: apiKey,
   });
@@ -350,10 +356,16 @@ export function deriveBoardState(
   routeColor: string = GREEN_LINE_COLOR,
 ): { arrivals: Arrival[]; trains: MapTrain[] } {
   const arrivals: Arrival[] = [];
-  const isGreenD = filter.routeId === ROUTE_ID;
-  const corridor = isGreenD
-    ? getMiniMapCorridor(filter.stopId)
-    : { stations: [] as StationInfo[], hasContinuation: false, maxStationIndex: -1 };
+  const onGreenLine = isGreenLineRoute(filter.routeId);
+  const onGreenMap = onGreenLine && Boolean(resolveStation(filter.stopId));
+  const corridor = onGreenMap
+    ? getMiniMapCorridor(filter.stopId, filter.directionId)
+    : {
+        stations: [] as StationInfo[],
+        hasContinuation: false,
+        maxStationIndex: -1,
+        homeStopId: filter.stopId,
+      };
 
   for (const prediction of collection.predictions.values()) {
     const attrs = prediction.attributes;
@@ -378,7 +390,7 @@ export function deriveBoardState(
       attrs.status,
     );
 
-    const location = isGreenD
+    const location = onGreenMap
       ? describeVehicleLocation(vehicle, collection.stops)
       : { label: null as string | null, stationIndex: null as number | null, progress: 0 };
     const directionId =
@@ -386,7 +398,7 @@ export function deriveBoardState(
     if (directionId !== filter.directionId) continue;
 
     const rawHeadsign = trip?.attributes.headsign || attrs.status || "Train";
-    const headsign = isGreenD
+    const headsign = onGreenLine
       ? normalizeHeadsign(rawHeadsign, filter.directionId)
       : rawHeadsign;
 
@@ -414,7 +426,7 @@ export function deriveBoardState(
   arrivals.sort((a, b) => a.etaMs - b.etaMs);
 
   const trains: MapTrain[] = [];
-  if (!isGreenD) {
+  if (!onGreenMap) {
     return { arrivals, trains };
   }
 

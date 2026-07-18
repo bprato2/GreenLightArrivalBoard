@@ -193,9 +193,10 @@ export function SettingsForm() {
             onChange={(v) => patch("alertImminentMinutes", v)}
           />
           <p className="mt-2 text-xs text-zinc-500">
-            Used for webhook / beacon phases. The on-screen leave banner uses walk
-            time vs train ETA: it only prompts for a catchable train, and shows a
-            miss notice when the soonest one is already too close.
+            Used for webhook / beacon phases. The on-screen leave banner ignores
+            these values and uses walk time vs train ETA instead: it prompts when
+            walking would leave at least 1 minute to spare, and shows a miss notice
+            when the soonest train is already too close.
           </p>
         </fieldset>
 

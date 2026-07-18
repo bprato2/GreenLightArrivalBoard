@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   DIRECTIONS,
+  GREEN_LINE_ALL_ID,
   coerceDirection,
   type DirectionId,
 } from "@/lib/mbta/boardConfig";
@@ -16,6 +17,8 @@ interface BoardRouteControlsProps {
   compact?: boolean;
   /** Hide mode selector when parent already shows mode tabs. */
   hideMode?: boolean;
+  /** Hide direction when parent places it elsewhere (e.g. above walk time). */
+  hideDirection?: boolean;
 }
 
 const selectClass =
@@ -28,12 +31,49 @@ const MODES: { id: TransitMode; label: string }[] = [
   { id: "amtrak", label: "Amtrak" },
 ];
 
-/** Mode → route → station → direction controls. */
+export function DirectionSelect({
+  settings,
+  onChange,
+  compact = false,
+}: {
+  settings: BoardSettings;
+  onChange: (patch: Partial<BoardSettings>) => void;
+  compact?: boolean;
+}) {
+  const labelClass = compact
+    ? "led-text text-[0.55rem] uppercase tracking-[0.2em] text-amber-700/80"
+    : "text-zinc-400 text-sm";
+  const fieldSelect = compact
+    ? `${selectClass} text-[0.65rem] uppercase tracking-wide w-full min-w-[7rem]`
+    : selectClass;
+
+  return (
+    <label className="flex flex-col gap-0.5">
+      <span className={labelClass}>Direction</span>
+      <select
+        className={fieldSelect}
+        value={coerceDirection(settings.directionId)}
+        onChange={(e) =>
+          onChange({ directionId: Number(e.target.value) as DirectionId })
+        }
+      >
+        {DIRECTIONS.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** Mode → route → departure station → direction controls. */
 export function BoardRouteControls({
   settings,
   onChange,
   compact = false,
   hideMode = false,
+  hideDirection = false,
 }: BoardRouteControlsProps) {
   const [routes, setRoutes] = useState<TransitRoute[]>([]);
   const [stops, setStops] = useState<TransitStop[]>([]);
@@ -147,7 +187,6 @@ export function BoardRouteControls({
       stopLon: stop?.lon ?? 0,
     });
   };
-  const setDirection = (directionId: DirectionId) => onChange({ directionId });
 
   const labelClass = compact
     ? "led-text text-[0.55rem] uppercase tracking-[0.2em] text-amber-700/80"
@@ -187,14 +226,18 @@ export function BoardRouteControls({
             >
               {routes.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.shortName ? `${r.shortName} · ${r.label}` : r.label}
+                  {r.id === GREEN_LINE_ALL_ID
+                    ? "Green Line (all)"
+                    : r.shortName
+                      ? `${r.shortName} · ${r.label}`
+                      : r.label}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="flex flex-col gap-0.5">
-            <span className={labelClass}>Station</span>
+            <span className={labelClass}>Departure Station</span>
             <select
               className={fieldSelect}
               value={
@@ -217,20 +260,13 @@ export function BoardRouteControls({
             </select>
           </label>
 
-          <label className="flex flex-col gap-0.5">
-            <span className={labelClass}>Direction</span>
-            <select
-              className={fieldSelect}
-              value={coerceDirection(settings.directionId)}
-              onChange={(e) => setDirection(Number(e.target.value) as DirectionId)}
-            >
-              {DIRECTIONS.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!hideDirection && (
+            <DirectionSelect
+              settings={settings}
+              onChange={onChange}
+              compact={compact}
+            />
+          )}
         </>
       )}
     </>
@@ -253,7 +289,9 @@ export function BoardRouteControls({
       <div className="mt-2 flex flex-col gap-3">{fields}</div>
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
       <p className="mt-2 text-xs text-zinc-500">
-        Live predictions follow the selected mode, route, station, and direction.
+        Live predictions follow the selected mode, route, departure station, and
+        direction. Choose Green Line (all) to see every Green branch at a shared
+        stop.
       </p>
     </fieldset>
   );

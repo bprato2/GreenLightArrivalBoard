@@ -68,23 +68,40 @@ const byName = new Map(
 );
 
 /**
- * Mini-map corridor centered on the selected home stop:
- * up to 4 stations toward Riverside, home, and 2 toward downtown.
+ * Mini-map corridor centered on the selected departure stop:
+ * 5 stations before (upstream) and 1 after (downstream) along travel direction.
+ * Inbound (1): before = toward Riverside, after = toward downtown.
+ * Outbound (0): before = toward downtown, after = toward Riverside.
  */
-export function getMiniMapCorridor(stopId: string): {
+export function getMiniMapCorridor(
+  stopId: string,
+  directionId: number = 1,
+): {
   stations: StationInfo[];
   hasContinuation: boolean;
   maxStationIndex: number;
+  /** Parent place-* id for the home marker (may differ from raw stopId). */
+  homeStopId: string;
 } {
-  const home = byId.get(stopId) ?? byId.get(TARGET_STOP_ID)!;
+  const home = resolveStation(stopId) ?? byId.get(TARGET_STOP_ID)!;
   const homeIdx = home.index;
-  const start = Math.max(0, homeIdx - 4);
-  const end = Math.min(GREEN_D_STATIONS.length - 1, homeIdx + 2);
+  const before = 5;
+  const after = 1;
+  // Stations are indexed Riverside (0) → downtown. Slice stays left-to-right.
+  const start =
+    directionId === 1
+      ? Math.max(0, homeIdx - before)
+      : Math.max(0, homeIdx - after);
+  const end =
+    directionId === 1
+      ? Math.min(GREEN_D_STATIONS.length - 1, homeIdx + after)
+      : Math.min(GREEN_D_STATIONS.length - 1, homeIdx + before);
   const stations = GREEN_D_STATIONS.slice(start, end + 1);
   return {
     stations,
     hasContinuation: end < GREEN_D_STATIONS.length - 1,
     maxStationIndex: stations[stations.length - 1]!.index,
+    homeStopId: home.id,
   };
 }
 

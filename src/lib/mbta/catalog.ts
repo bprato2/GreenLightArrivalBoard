@@ -2,6 +2,11 @@
  * Fetch MBTA V3 routes and stops for the live board / planner catalogs.
  */
 
+import {
+  GREEN_LINE_ALL_ID,
+  GREEN_LINE_COLOR,
+  expandRouteFilter,
+} from "@/lib/mbta/boardConfig";
 import { getApiKey } from "@/lib/mbta/parse";
 import type { TransitMode, TransitRoute, TransitStop } from "@/lib/providers/types";
 import { routeTypesForMode } from "@/lib/providers/types";
@@ -94,20 +99,37 @@ export async function fetchRoutesForMode(mode: TransitMode): Promise<TransitRout
   if (!res.ok) throw new Error(`Routes HTTP ${res.status}`);
 
   const body = (await res.json()) as { data: MbtaRouteResource[] };
-  return (body.data ?? []).map((r) => ({
+  const routes: TransitRoute[] = (body.data ?? []).map((r) => ({
     id: r.id,
     label: r.attributes.long_name || r.attributes.short_name || r.id,
     shortName: r.attributes.short_name ?? undefined,
     color: r.attributes.color ? `#${r.attributes.color}` : "#888888",
     type: r.attributes.type,
   }));
+
+  // Offer "Green Line" (all branches) above the individual B/C/D/E options.
+  if (mode === "subway") {
+    const greenIdx = routes.findIndex((r) => r.id.startsWith("Green-"));
+    if (greenIdx >= 0) {
+      routes.splice(greenIdx, 0, {
+        id: GREEN_LINE_ALL_ID,
+        label: "Green Line",
+        shortName: "Green",
+        color: GREEN_LINE_COLOR,
+        type: 0,
+      });
+    }
+  }
+
+  return routes;
 }
 
 export async function fetchStopsForRoute(routeId: string): Promise<TransitStop[]> {
   if (!routeId) return [];
   const apiKey = getApiKey();
+  const routeFilter = expandRouteFilter(routeId);
   const url =
-    `${MBTA_BASE}/stops?filter[route]=${encodeURIComponent(routeId)}` +
+    `${MBTA_BASE}/stops?filter[route]=${encodeURIComponent(routeFilter)}` +
     `&fields[stop]=name,latitude,longitude,location_type` +
     apiKeyParam(apiKey);
 
@@ -130,7 +152,13 @@ export async function searchStops(
   if (!types) return [];
 
   const routes = await fetchRoutesForMode(mode);
-  const routeIds = routes.slice(0, mode === "bus" ? 40 : routes.length).map((r) => r.id);
+  const routeIds = [
+    ...new Set(
+      routes
+        .slice(0, mode === "bus" ? 40 : routes.length)
+        .flatMap((r) => expandRouteFilter(r.id).split(",")),
+    ),
+  ];
   if (routeIds.length === 0) return [];
 
   const apiKey = getApiKey();

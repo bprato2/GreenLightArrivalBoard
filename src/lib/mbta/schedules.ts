@@ -1,4 +1,4 @@
-import { GREEN_LINE_COLOR, ROUTE_ID, type DirectionId } from "./boardConfig";
+import { GREEN_LINE_COLOR, ROUTE_ID, expandRouteFilter, isGreenLineRoute, type DirectionId } from "./boardConfig";
 import { TARGET_STOP_ID } from "./stations";
 import type { Arrival, ScheduleResource } from "./types";
 import { normalizeHeadsign } from "./headsign";
@@ -13,7 +13,7 @@ export function buildSchedulesUrl(
 ): string {
   const params = new URLSearchParams({
     "filter[stop]": stopId,
-    "filter[route]": routeId,
+    "filter[route]": expandRouteFilter(routeId),
     "filter[direction_id]": String(directionId),
     sort: "arrival_time",
     include: "trip",
@@ -74,8 +74,8 @@ export function deriveScheduledArrivals(
   const liveEtaKeys = new Set(liveArrivals.map((a) => Math.round(a.etaMs / 60_000)));
 
   const rows: Arrival[] = [];
-  const isGreenD = routeId === ROUTE_ID;
-  const defaultHeadsign = isGreenD
+  const onGreenLine = isGreenLineRoute(routeId);
+  const defaultHeadsign = onGreenLine
     ? directionId === 1
       ? "Union Square"
       : "Riverside"
@@ -100,7 +100,7 @@ export function deriveScheduledArrivals(
 
     const trip = tripId ? trips.get(tripId) : undefined;
     const raw = trip?.headsign ?? defaultHeadsign;
-    const headsign = isGreenD ? normalizeHeadsign(raw, directionId) : raw;
+    const headsign = onGreenLine ? normalizeHeadsign(raw, directionId) : raw;
     const minutesAway = Math.max(0, Math.ceil((etaMs - nowMs) / 60_000));
 
     rows.push({

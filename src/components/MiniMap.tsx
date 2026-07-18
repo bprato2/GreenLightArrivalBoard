@@ -63,11 +63,14 @@ function corridorTitle(stations: StationInfo[], stopId: string, rideMinutes: num
 
 /** Data-driven Green Line D corridor map with leg times and animated trains. */
 export function MiniMap({ trains, glow, stopId, directionId }: MiniMapProps) {
-  const { stations, hasContinuation } = getMiniMapCorridor(stopId);
+  const { stations, hasContinuation, homeStopId } = getMiniMapCorridor(
+    stopId,
+    directionId,
+  );
   const stationCount = stations.length;
   const segmentCount = Math.max(1, stationCount - 1 + (hasContinuation ? 0.35 : 0));
   const corridorStart = stations[0]?.index ?? 0;
-  const rideMinutes = minutesFromHomeAlongCorridor(stations, stopId);
+  const rideMinutes = minutesFromHomeAlongCorridor(stations, homeStopId);
   const color = GREEN_LINE_COLOR;
   const inbound = directionId === 1;
 
@@ -81,7 +84,7 @@ export function MiniMap({ trains, glow, stopId, directionId }: MiniMapProps) {
         className="led-text mb-1.5 text-center text-[0.65rem] uppercase tracking-[0.28em] text-amber-600/80"
         style={{ textShadow: `0 0 ${4 + glow * 8}px rgba(255,176,0,0.35)` }}
       >
-        {corridorTitle(stations, stopId, rideMinutes)}
+        {corridorTitle(stations, homeStopId, rideMinutes)}
       </div>
 
       <div className="relative mx-auto w-full max-w-[98%] flex-1">
@@ -95,7 +98,7 @@ export function MiniMap({ trains, glow, stopId, directionId }: MiniMapProps) {
 
         <div className="relative h-full">
           {stations.map((station, i) => {
-            const isHome = station.id === stopId;
+            const isHome = station.id === homeStopId;
             return (
               <div
                 key={station.id}
