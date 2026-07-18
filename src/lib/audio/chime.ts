@@ -48,6 +48,12 @@ async function primeAudioContext(ctx: AudioContext): Promise<void> {
   source.stop(ctx.currentTime + 0.01);
 }
 
+/** True when the shared AudioContext is running and can produce sound. */
+export function isAudioUnlocked(): boolean {
+  const ctx = getAudioContext();
+  return !!ctx && ctx.state === "running";
+}
+
 /** Play the iconic two-tone MBTA chime. Resolves when both notes have finished. */
 export function playMBTAChime(): Promise<void> {
   return new Promise((resolve) => {
@@ -75,24 +81,40 @@ export function playMBTAChime(): Promise<void> {
 /** @deprecated Use playMBTAChime */
 export const playMbtaChime = playMBTAChime;
 
+/**
+ * Resume + prime the AudioContext.
+ * Mobile browsers often reject the first attempt when it is not inside a user
+ * gesture; we must allow later taps to retry (do not cache a failed unlock).
+ */
 export async function unlockAudio(): Promise<void> {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (isAudioUnlocked()) return;
+
   if (unlockPromise) {
     await unlockPromise;
-    return;
+    if (isAudioUnlocked()) return;
   }
 
-  unlockPromise = (async () => {
-    const ctx = getAudioContext();
-    if (!ctx) return;
+  const attempt = (async () => {
     try {
       if (ctx.state === "suspended") {
         await ctx.resume();
       }
-      await primeAudioContext(ctx);
+      if (ctx.state === "running") {
+        await primeAudioContext(ctx);
+      }
     } catch {
-      /* ignore */
+      /* Mobile autoplay policies may reject until a user gesture. */
     }
   })();
 
-  await unlockPromise;
+  unlockPromise = attempt;
+  try {
+    await attempt;
+  } finally {
+    if (unlockPromise === attempt) {
+      unlockPromise = null;
+    }
+  }
 }

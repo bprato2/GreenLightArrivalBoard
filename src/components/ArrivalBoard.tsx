@@ -77,8 +77,11 @@ export function ArrivalBoard() {
     settings.stopId;
   const closestMinutes = arrivals[0]?.minutesAway ?? null;
 
-  useAnnouncements(arrivals, settings.announcementsEnabled && !isAmtrak);
-  useArrivalAlert(closestMinutes, settings);
+const { needsGesture, enableFromGesture } = useAnnouncements(
+  arrivals,
+  settings.announcementsEnabled && !isAmtrak,
+);
+useArrivalAlert(closestMinutes, settings);
 
   const glow = settings.ledGlowIntensity;
 
@@ -261,6 +264,11 @@ export function ArrivalBoard() {
           <AnnouncementManager active={settings.announcementsEnabled} />
         </>
       )}
+<AnnouncementManager
+  active={settings.announcementsEnabled}
+  needsGesture={needsGesture}
+  onEnable={enableFromGesture}
+/>
     </div>
   );
 }

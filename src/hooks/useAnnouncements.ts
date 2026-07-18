@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { playMBTAChime, unlockAudio } from "@/lib/audio/chime";
+import { useEffect, useRef, useState } from "react";
+import { isAudioUnlocked, playMBTAChime, unlockAudio } from "@/lib/audio/chime";
 import {
   buildArrivingAnnouncement,
   buildThreeMinuteAnnouncement,
+  isSpeechUnlocked,
   primeSpeechSynthesis,
   speakAnnouncement,
+  unlockSpeechSynthesis,
 } from "@/lib/audio/speech";
 import type { Arrival } from "@/lib/mbta/types";
 
@@ -36,43 +38,77 @@ function isArrivingMilestone(arrival: Arrival): boolean {
   );
 }
 
+function audioReady(): boolean {
+  return isAudioUnlocked() && isSpeechUnlocked();
+}
+
 /**
  * Chime + TTS for inbound trains at the 3-minute and arriving windows.
  * Uses threshold-crossing detection so announcements fire even if the 1 Hz
  * tick skips an exact minute value. Each trip is announced at most once
  * per milestone.
+ *
+ * Mobile browsers require a user gesture before Web Audio / SpeechSynthesis
+ * will play. `needsGesture` is true until that unlock succeeds.
  */
 export function useAnnouncements(
   arrivals: Arrival[],
   enabled: boolean,
-): { testAnnouncement: () => Promise<void> } {
+): {
+  testAnnouncement: () => Promise<void>;
+  enableFromGesture: () => Promise<void>;
+  needsGesture: boolean;
+} {
   const announcedIds = useRef(new Set<string>());
   const prevMinutes = useRef(new Map<string, number>());
   const queue = useRef(Promise.resolve());
+  const [needsGesture, setNeedsGesture] = useState(false);
+
+  const refreshGestureState = () => {
+    setNeedsGesture(enabled && !audioReady());
+  };
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setNeedsGesture(false);
+      return;
+    }
 
     primeSpeechSynthesis();
-    void unlockAudio();
+    refreshGestureState();
 
+    const syncUnlockState = async () => {
+      await unlockAudio();
+      refreshGestureState();
+    };
+
+    void syncUnlockState();
+
+    // Soft unlock on any interaction (helps Android / desktop).
+    // iOS often still needs the explicit Enable button for a trusted speak().
     const unlock = () => {
-      void unlockAudio();
-      primeSpeechSynthesis();
+      unlockSpeechSynthesis();
+      void unlockAudio().then(() => {
+        refreshGestureState();
+      });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void syncUnlockState();
     };
 
     window.addEventListener("pointerdown", unlock);
     window.addEventListener("keydown", unlock);
     window.addEventListener("touchstart", unlock, { passive: true });
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") void unlockAudio();
-    });
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
       window.removeEventListener("touchstart", unlock);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshGestureState closes over enabled
   }, [enabled]);
 
   useEffect(() => {
@@ -122,11 +158,25 @@ export function useAnnouncements(
     }
   }, [arrivals, enabled]);
 
+  const enableFromGesture = async () => {
+    // speak() must run synchronously in this click handler for iOS
+    // (before any await yields the gesture privilege).
+    unlockSpeechSynthesis();
+    await unlockAudio();
+    await playMBTAChime();
+    await speakAnnouncement("Announcements enabled.");
+    refreshGestureState();
+  };
+
   return {
+    needsGesture,
+    enableFromGesture,
     testAnnouncement: async () => {
+      unlockSpeechSynthesis();
       await unlockAudio();
       await playMBTAChime();
       await speakAnnouncement(buildThreeMinuteAnnouncement("Union Square"));
+      refreshGestureState();
     },
   };
 }
