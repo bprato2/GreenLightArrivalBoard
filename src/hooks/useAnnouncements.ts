@@ -158,15 +158,14 @@ export function useAnnouncements(
     }
   }, [arrivals, enabled]);
 
-  const enableFromGesture = () => {
-    // speak() must run synchronously in this click handler for iOS.
+  const enableFromGesture = async () => {
+    // speak() must run synchronously in this click handler for iOS
+    // (before any await yields the gesture privilege).
     unlockSpeechSynthesis();
-    void (async () => {
-      await unlockAudio();
-      await playMBTAChime();
-      await speakAnnouncement("Announcements enabled.");
-      refreshGestureState();
-    })();
+    await unlockAudio();
+    await playMBTAChime();
+    await speakAnnouncement("Announcements enabled.");
+    refreshGestureState();
   };
 
   return {
