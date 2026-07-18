@@ -20,11 +20,16 @@ import { useArrivalAlert } from "@/hooks/useArrivalAlert";
 import { useClock } from "@/hooks/useClock";
 import { useMbtaSchedules } from "@/hooks/useMbtaSchedules";
 import { useMbtaStream } from "@/hooks/useMbtaStream";
+import { useRouteCorridor } from "@/hooks/useRouteCorridor";
 import { useSettings } from "@/hooks/useSettings";
 import { useWalkToStation } from "@/hooks/useWalkToStation";
 import { useWeather } from "@/hooks/useWeather";
-import { ROUTE_ID, getDirectionOption, isGreenLineRoute } from "@/lib/mbta/boardConfig";
-import { resolveStation, stationDisplayName } from "@/lib/mbta/stations";
+import {
+  GREEN_LINE_ALL_ID,
+  ROUTE_ID,
+  getDirectionOption,
+} from "@/lib/mbta/boardConfig";
+import { stationDisplayName } from "@/lib/mbta/stations";
 import { getLeaveAdvice } from "@/lib/walk";
 import type { Arrival } from "@/lib/mbta/types";
 import type { TransitMode } from "@/lib/providers/types";
@@ -37,10 +42,17 @@ export function ArrivalBoard() {
   const router = useRouter();
   const { settings, setSettings, hydrated } = useSettings();
   const isAmtrak = settings.mode === "amtrak";
-  const showMiniMap =
+  const mapEnabled =
     settings.miniMapEnabled &&
-    isGreenLineRoute(settings.routeId) &&
-    Boolean(resolveStation(settings.stopId));
+    !isAmtrak &&
+    Boolean(settings.routeId && settings.stopId);
+  const { corridor, line } = useRouteCorridor(
+    settings.routeId,
+    settings.stopId,
+    settings.directionId,
+    mapEnabled,
+  );
+  const showMiniMap = mapEnabled && Boolean(corridor && corridor.stations.length > 0);
   const filter = {
     stopId: settings.stopId,
     directionId: settings.directionId,
@@ -49,6 +61,8 @@ export function ArrivalBoard() {
   const { arrivals, trains, connected, error, nowMs } = useMbtaStream(filter, {
     routeColor: settings.routeColor,
     enabled: !isAmtrak && Boolean(settings.routeId && settings.stopId),
+    corridor,
+    line,
   });
   const { scheduled, schedules } = useMbtaSchedules(
     arrivals,
@@ -79,6 +93,12 @@ export function ArrivalBoard() {
     stationDisplayName(settings.stopId) ||
     settings.stopId;
   const closestMinutes = arrivals[0]?.minutesAway ?? null;
+  const routeLabel =
+    settings.routeId === GREEN_LINE_ALL_ID
+      ? "Green Line"
+      : settings.routeId.startsWith("Green-")
+        ? `Green Line ${settings.routeId.replace("Green-", "")}`
+        : settings.routeId || "Line";
 
 const { needsGesture, enableFromGesture } = useAnnouncements(
   arrivals,
@@ -261,12 +281,14 @@ useArrivalAlert(closestMinutes, settings);
 
           <LeaveForStationNow advice={leaveAdvice} />
 
-          {showMiniMap && (
+          {showMiniMap && corridor && (
             <section className="relative z-30 h-[22vh] min-h-[132px] max-h-[200px] shrink-0 border-t border-amber-900/30 bg-gradient-to-b from-transparent to-emerald-950/20">
               <MiniMap
                 trains={trains}
                 glow={glow}
-                stopId={settings.stopId}
+                corridor={corridor}
+                routeColor={settings.routeColor}
+                routeLabel={routeLabel}
                 directionId={settings.directionId}
               />
             </section>

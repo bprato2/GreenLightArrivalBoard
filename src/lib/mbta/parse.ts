@@ -6,10 +6,13 @@ import {
   type DirectionId,
 } from "./boardConfig";
 import {
-  getMiniMapCorridor,
+  findStationOnLine,
+  indexOnCorridor,
+  type MiniMapCorridor,
+} from "./corridor";
+import {
   resolveStation,
   resolveStationByName,
-  stationIndex,
   stationName,
   TARGET_STOP_ID,
   type StationInfo,
@@ -193,9 +196,10 @@ function vehicleMapPosition(
   stops: Map<string, StopResource>,
   corridor: StationInfo[],
   maxStationIndex: number,
+  fullLine: StationInfo[],
 ): { stationIndex: number; progress: number } | null {
   const directionId = vehicle.attributes.direction_id ?? 0;
-  const location = describeVehicleLocation(vehicle, stops);
+  const location = describeVehicleLocation(vehicle, stops, fullLine);
 
   let stationIndexValue = location.stationIndex;
   let progress = location.progress;
@@ -204,7 +208,7 @@ function vehicleMapPosition(
     const fromCoords = positionFromLatLon(
       vehicle.attributes.latitude,
       vehicle.attributes.longitude,
-      corridor,
+      fullLine.length >= 2 ? fullLine : corridor,
     );
     if (!fromCoords) return null;
     stationIndexValue = fromCoords.stationIndex;
@@ -284,6 +288,7 @@ function projectPointOnSegment(
 function describeVehicleLocation(
   vehicle: VehicleResource | undefined,
   stops: Map<string, StopResource>,
+  line: StationInfo[] = [],
 ): { label: string | null; stationIndex: number | null; progress: number } {
   if (!vehicle) {
     return { label: null, stationIndex: null, progress: 0 };
@@ -291,8 +296,11 @@ function describeVehicleLocation(
 
   const stopRelId = relatedId(vehicle, "stop");
   const parentId = parentStopId(stopRelId, stops);
-  const idx = stationIndex(parentId);
+  const idx =
+    indexOnCorridor(line, parentId) ??
+    indexOnCorridor(line, stopRelId);
   const name =
+    (parentId ? findStationOnLine(line, parentId)?.name : null) ??
     stationName(parentId) ??
     (stopRelId ? stops.get(stopRelId)?.attributes.name : null) ??
     null;
@@ -302,7 +310,7 @@ function describeVehicleLocation(
   let progress = 0;
 
   if (!name || idx === null) {
-    return { label: null, stationIndex: idx, progress: 0 };
+    return { label: name ? `Near ${name}` : null, stationIndex: idx, progress: 0 };
   }
 
   switch (status) {
@@ -316,7 +324,6 @@ function describeVehicleLocation(
       break;
     case "IN_TRANSIT_TO":
       label = `En route to ${name}`;
-      // Treat as moving toward this station from the previous one.
       progress = 0.45;
       break;
     default:
@@ -354,18 +361,15 @@ export function deriveBoardState(
     routeId: ROUTE_ID,
   },
   routeColor: string = GREEN_LINE_COLOR,
+  mapCorridor: MiniMapCorridor | null = null,
+  fullLine: StationInfo[] = [],
 ): { arrivals: Arrival[]; trains: MapTrain[] } {
   const arrivals: Arrival[] = [];
   const onGreenLine = isGreenLineRoute(filter.routeId);
-  const onGreenMap = onGreenLine && Boolean(resolveStation(filter.stopId));
-  const corridor = onGreenMap
-    ? getMiniMapCorridor(filter.stopId, filter.directionId)
-    : {
-        stations: [] as StationInfo[],
-        hasContinuation: false,
-        maxStationIndex: -1,
-        homeStopId: filter.stopId,
-      };
+  const corridor = mapCorridor;
+  const lineForLookup =
+    fullLine.length > 0 ? fullLine : (corridor?.stations ?? []);
+  const showMap = Boolean(corridor && corridor.stations.length > 0);
 
   for (const prediction of collection.predictions.values()) {
     const attrs = prediction.attributes;
@@ -390,8 +394,8 @@ export function deriveBoardState(
       attrs.status,
     );
 
-    const location = onGreenMap
-      ? describeVehicleLocation(vehicle, collection.stops)
+    const location = showMap
+      ? describeVehicleLocation(vehicle, collection.stops, lineForLookup)
       : { label: null as string | null, stationIndex: null as number | null, progress: 0 };
     const directionId =
       trip?.attributes.direction_id ?? attrs.direction_id ?? 0;
@@ -426,7 +430,7 @@ export function deriveBoardState(
   arrivals.sort((a, b) => a.etaMs - b.etaMs);
 
   const trains: MapTrain[] = [];
-  if (!onGreenMap) {
+  if (!showMap || !corridor) {
     return { arrivals, trains };
   }
 
@@ -442,6 +446,7 @@ export function deriveBoardState(
       collection.stops,
       corridor.stations,
       corridor.maxStationIndex,
+      lineForLookup,
     );
     if (!position) return;
 

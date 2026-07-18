@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from "react";
 import {
+  DepartureStationSelect,
+  type DepartureStationSelection,
+} from "@/components/DepartureStationSelect";
+import {
   DIRECTIONS,
   GREEN_LINE_ALL_ID,
   coerceDirection,
   type DirectionId,
 } from "@/lib/mbta/boardConfig";
-import { fetchRoutesForMode, fetchStopsForRoute } from "@/lib/mbta/catalog";
+import { fetchRoutesForMode, fetchStopsForRoute, fetchNetworkStopCatalog } from "@/lib/mbta/catalog";
 import type { TransitMode, TransitRoute, TransitStop } from "@/lib/providers/types";
 import type { BoardSettings } from "@/types/settings";
 
@@ -81,6 +85,11 @@ export function BoardRouteControls({
   const [loadingStops, setLoadingStops] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Warm the all-stations catalog in the background.
+  useEffect(() => {
+    void fetchNetworkStopCatalog().catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (settings.mode === "amtrak") {
       setRoutes([]);
@@ -128,8 +137,9 @@ export function BoardRouteControls({
       .then((list) => {
         if (cancelled) return;
         setStops(list);
+        // Only auto-pick a stop when none is set (avoid clobbering network jumps).
         const stillValid = list.some((s) => s.id === settings.stopId);
-        if (!stillValid && list[0]) {
+        if (!stillValid && !settings.stopId && list[0]) {
           onChange({
             stopId: list[0].id,
             stopName: list[0].name,
@@ -175,16 +185,28 @@ export function BoardRouteControls({
       routeId,
       routeColor: route?.color ?? settings.routeColor,
       stopId: "",
+      stopName: "",
     });
   };
 
-  const setStation = (stopId: string) => {
-    const stop = stops.find((s) => s.id === stopId);
+  const setStationSelection = (selection: DepartureStationSelection) => {
+    if (selection.mode && selection.routeId) {
+      onChange({
+        mode: selection.mode,
+        routeId: selection.routeId,
+        routeColor: selection.routeColor ?? settings.routeColor,
+        stopId: selection.stopId,
+        stopName: selection.stopName,
+        stopLat: selection.stopLat,
+        stopLon: selection.stopLon,
+      });
+      return;
+    }
     onChange({
-      stopId,
-      stopName: stop?.name ?? stopId,
-      stopLat: stop?.lat ?? 0,
-      stopLon: stop?.lon ?? 0,
+      stopId: selection.stopId,
+      stopName: selection.stopName,
+      stopLat: selection.stopLat,
+      stopLon: selection.stopLon,
     });
   };
 
@@ -236,29 +258,19 @@ export function BoardRouteControls({
             </select>
           </label>
 
-          <label className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-0.5">
             <span className={labelClass}>Departure Station</span>
-            <select
-              className={fieldSelect}
-              value={
-                stops.some((s) => s.id === settings.stopId) ? settings.stopId : ""
-              }
-              disabled={loadingStops || stops.length === 0}
-              onChange={(e) => setStation(e.target.value)}
-            >
-              {loadingStops && (
-                <option value="">Loading…</option>
-              )}
-              {!loadingStops && stops.length === 0 && (
-                <option value="">No stations</option>
-              )}
-              {stops.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <DepartureStationSelect
+              routeId={settings.routeId}
+              stopId={settings.stopId}
+              stopName={settings.stopName}
+              routeStops={stops}
+              loadingRouteStops={loadingStops}
+              compact={compact}
+              disabled={settings.mode === "amtrak"}
+              onSelect={setStationSelection}
+            />
+          </div>
 
           {!hideDirection && (
             <DirectionSelect
@@ -289,9 +301,8 @@ export function BoardRouteControls({
       <div className="mt-2 flex flex-col gap-3">{fields}</div>
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
       <p className="mt-2 text-xs text-zinc-500">
-        Live predictions follow the selected mode, route, departure station, and
-        direction. Choose Green Line (all) to see every Green branch at a shared
-        stop.
+        Current-line stations stay on top. Scroll further for the full network
+        (subway, commuter rail, bus) — picking one jumps mode and route for you.
       </p>
     </fieldset>
   );

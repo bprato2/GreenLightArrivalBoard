@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MiniMapCorridor } from "@/lib/mbta/corridor";
 import {
   applyStreamEvent,
   buildPredictionsUrl,
@@ -10,6 +11,7 @@ import {
   getApiKey,
   type BoardFilter,
 } from "@/lib/mbta/parse";
+import type { StationInfo } from "@/lib/mbta/stations";
 import type { Arrival, MapTrain, StreamCollection } from "@/lib/mbta/types";
 
 const RECONNECT_MS = 2 * 60 * 60 * 1000;
@@ -28,6 +30,10 @@ export interface UseMbtaStreamOptions {
   routeColor?: string;
   /** When false, skip connecting (e.g. Amtrak mode). */
   enabled?: boolean;
+  /** Windowed corridor for the mini-map (any route). */
+  corridor?: MiniMapCorridor | null;
+  /** Full ordered line for vehicle stop lookup / GPS projection. */
+  line?: StationInfo[];
 }
 
 /**
@@ -37,12 +43,21 @@ export function useMbtaStream(
   filter: BoardFilter,
   options: UseMbtaStreamOptions = {},
 ): UseMbtaStreamResult {
-  const { routeColor = "#00843d", enabled = true } = options;
+  const {
+    routeColor = "#00843d",
+    enabled = true,
+    corridor = null,
+    line = [],
+  } = options;
   const collectionRef = useRef<StreamCollection>(emptyCollection());
   const filterRef = useRef(filter);
   filterRef.current = filter;
   const colorRef = useRef(routeColor);
   colorRef.current = routeColor;
+  const corridorRef = useRef(corridor);
+  corridorRef.current = corridor;
+  const lineRef = useRef(line);
+  lineRef.current = line;
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [trains, setTrains] = useState<MapTrain[]>([]);
   const [connected, setConnected] = useState(false);
@@ -152,6 +167,8 @@ export function useMbtaStream(
         now,
         filterRef.current,
         colorRef.current,
+        corridorRef.current,
+        lineRef.current,
       );
       setArrivals(derived.arrivals);
       setTrains(derived.trains);

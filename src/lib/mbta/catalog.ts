@@ -9,9 +9,126 @@ import {
 } from "@/lib/mbta/boardConfig";
 import { getApiKey } from "@/lib/mbta/parse";
 import type { TransitMode, TransitRoute, TransitStop } from "@/lib/providers/types";
-import { routeTypesForMode } from "@/lib/providers/types";
+import { routeTypesForMode, TRANSIT_MODES } from "@/lib/providers/types";
 
 const MBTA_BASE = "https://api-v3.mbta.com";
+
+/** A stop reachable on a specific mode + route (for the all-stations picker). */
+export interface NetworkStopEntry {
+  key: string;
+  stopId: string;
+  stopName: string;
+  lat: number;
+  lon: number;
+  mode: TransitMode;
+  modeLabel: string;
+  routeId: string;
+  routeLabel: string;
+  routeShortName?: string;
+  routeColor: string;
+}
+
+function modeLabel(mode: TransitMode): string {
+  return TRANSIT_MODES.find((m) => m.id === mode)?.label ?? mode;
+}
+
+function routeDisplayName(route: TransitRoute): string {
+  if (route.id === GREEN_LINE_ALL_ID) return "Green Line";
+  if (route.shortName) return route.shortName;
+  return route.label;
+}
+
+let networkCatalogPromise: Promise<NetworkStopEntry[]> | null = null;
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]!);
+    }
+  }
+  const workers = Array.from(
+    { length: Math.min(concurrency, Math.max(1, items.length)) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * Load stops across subway, commuter rail, and bus with mode/route metadata.
+ * Cached for the session. Bus routes are capped to keep the first load usable.
+ */
+export function fetchNetworkStopCatalog(): Promise<NetworkStopEntry[]> {
+  if (!networkCatalogPromise) {
+    networkCatalogPromise = buildNetworkStopCatalog().catch((err) => {
+      networkCatalogPromise = null;
+      throw err;
+    });
+  }
+  return networkCatalogPromise;
+}
+
+async function buildNetworkStopCatalog(): Promise<NetworkStopEntry[]> {
+  const modes: TransitMode[] = ["subway", "commuter_rail", "bus"];
+  const entries: NetworkStopEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const mode of modes) {
+    const routes = await fetchRoutesForMode(mode);
+    // Skip synthetic Green-all (branches already listed); cap bus volume.
+    const usable = routes.filter((r) => r.id !== GREEN_LINE_ALL_ID);
+    const limited =
+      mode === "bus" ? usable.slice(0, 60) : usable;
+
+    const perRoute = await mapPool(limited, 5, async (route) => {
+      try {
+        const stops = await fetchStopsForRoute(route.id);
+        return { route, stops };
+      } catch {
+        return { route, stops: [] as TransitStop[] };
+      }
+    });
+
+    for (const { route, stops } of perRoute) {
+      const line = routeDisplayName(route);
+      for (const stop of stops) {
+        const key = `${mode}::${route.id}::${stop.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        entries.push({
+          key,
+          stopId: stop.id,
+          stopName: stop.name,
+          lat: stop.lat,
+          lon: stop.lon,
+          mode,
+          modeLabel: modeLabel(mode),
+          routeId: route.id,
+          routeLabel: line,
+          routeShortName: route.shortName,
+          routeColor: route.color,
+        });
+      }
+    }
+  }
+
+  entries.sort((a, b) => {
+    const modeOrder =
+      modes.indexOf(a.mode) - modes.indexOf(b.mode) ||
+      a.routeLabel.localeCompare(b.routeLabel) ||
+      a.stopName.localeCompare(b.stopName);
+    return modeOrder;
+  });
+
+  return entries;
+}
 
 interface MbtaRouteResource {
   id: string;

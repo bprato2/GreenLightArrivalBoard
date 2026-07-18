@@ -1,19 +1,19 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { GREEN_LINE_COLOR } from "@/lib/mbta/boardConfig";
-import {
-  getMiniMapCorridor,
-  minutesFromHomeAlongCorridor,
-  type StationInfo,
-} from "@/lib/mbta/stations";
+import { type StationInfo } from "@/lib/mbta/stations";
+import type { MiniMapCorridor } from "@/lib/mbta/corridor";
 import type { MapTrain } from "@/lib/mbta/types";
 
 interface MiniMapProps {
   trains: MapTrain[];
   glow: number;
-  stopId: string;
-  /** 1 = inbound (toward downtown), 0 = outbound. */
+  corridor: MiniMapCorridor;
+  /** Accent color for the track / trains. */
+  routeColor: string;
+  /** Short label for the title (e.g. "Orange", "Green Line D"). */
+  routeLabel: string;
+  /** 1 = inbound, 0 = outbound. */
   directionId: number;
 }
 
@@ -54,24 +54,32 @@ function TramIcon({ inbound, color }: { inbound: boolean; color: string }) {
   );
 }
 
-function corridorTitle(stations: StationInfo[], stopId: string, rideMinutes: number): string {
-  if (stations.length === 0) return "Green Line D";
+function corridorTitle(stations: StationInfo[], routeLabel: string): string {
+  if (stations.length === 0) return routeLabel;
   const first = stations[0]!.shortName;
   const last = stations[stations.length - 1]!.shortName;
-  return `Green Line D · ${first} → ${last} · ~${rideMinutes} min from home`;
+  return `${routeLabel} · ${first} → ${last}`;
 }
 
-/** Data-driven Green Line D corridor map with leg times and animated trains. */
-export function MiniMap({ trains, glow, stopId, directionId }: MiniMapProps) {
-  const { stations, hasContinuation, homeStopId } = getMiniMapCorridor(
-    stopId,
-    directionId,
-  );
+function trackGlow(color: string): string {
+  // Soften track shadow toward the route color without needing color-mix support.
+  return `0 0 10px ${color}73`;
+}
+
+/** Corridor map with leg times and animated trains for any selected route. */
+export function MiniMap({
+  trains,
+  glow,
+  corridor,
+  routeColor,
+  routeLabel,
+  directionId,
+}: MiniMapProps) {
+  const { stations, hasContinuation, homeStopId } = corridor;
   const stationCount = stations.length;
   const segmentCount = Math.max(1, stationCount - 1 + (hasContinuation ? 0.35 : 0));
   const corridorStart = stations[0]?.index ?? 0;
-  const rideMinutes = minutesFromHomeAlongCorridor(stations, homeStopId);
-  const color = GREEN_LINE_COLOR;
+  const color = routeColor || "#888888";
   const inbound = directionId === 1;
 
   const stationLeft = (index: number) => `${(index / segmentCount) * 100}%`;
@@ -84,15 +92,16 @@ export function MiniMap({ trains, glow, stopId, directionId }: MiniMapProps) {
         className="led-text mb-1.5 text-center text-[0.65rem] uppercase tracking-[0.28em] text-amber-600/80"
         style={{ textShadow: `0 0 ${4 + glow * 8}px rgba(255,176,0,0.35)` }}
       >
-        {corridorTitle(stations, homeStopId, rideMinutes)}
+        {corridorTitle(stations, routeLabel)}
       </div>
 
       <div className="relative mx-auto w-full max-w-[98%] flex-1">
         <div
-          className="absolute left-0 top-[36%] h-[3px] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.45)]"
+          className="absolute left-0 top-[36%] h-[3px] rounded-full"
           style={{
             right: hasContinuation ? "2%" : "0",
-            background: `linear-gradient(90deg, #064e3b, ${color}cc, #064e3b)`,
+            background: `linear-gradient(90deg, #1a1a1a, ${color}cc, #1a1a1a)`,
+            boxShadow: trackGlow(color),
           }}
         />
 
@@ -108,15 +117,19 @@ export function MiniMap({ trains, glow, stopId, directionId }: MiniMapProps) {
                 {isHome && <HomeMarker />}
                 <div
                   className={`h-2.5 w-2.5 rounded-full border ${
-                    isHome
-                      ? "border-amber-300 bg-amber-400"
-                      : "border-emerald-400/70 bg-black"
+                    isHome ? "border-amber-300 bg-amber-400" : "bg-black"
                   }`}
+                  style={
+                    isHome
+                      ? undefined
+                      : { borderColor: `${color}b3` }
+                  }
                 />
                 <div
                   className={`absolute left-1/2 top-3.5 w-[3.1rem] -translate-x-1/2 text-center text-[0.5rem] leading-tight tracking-wide ${
-                    isHome ? "text-amber-300" : "text-emerald-500/70"
+                    isHome ? "text-amber-300" : "text-zinc-500"
                   }`}
+                  style={isHome ? undefined : { color: `${color}b3` }}
                 >
                   {station.shortName}
                 </div>
@@ -139,8 +152,8 @@ export function MiniMap({ trains, glow, stopId, directionId }: MiniMapProps) {
 
           {hasContinuation && (
             <div
-              className="absolute top-[36%] -translate-x-1/2 -translate-y-1/2 text-[0.85rem] tracking-[0.35em] text-emerald-500/55"
-              style={{ left: continuationLeft }}
+              className="absolute top-[36%] -translate-x-1/2 -translate-y-1/2 text-[0.85rem] tracking-[0.35em] text-zinc-600"
+              style={{ left: continuationLeft, color: `${color}8c` }}
               aria-hidden
             >
               ···

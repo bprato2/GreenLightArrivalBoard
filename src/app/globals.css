@@ -29,9 +29,15 @@ body {
   user-select: none;
 }
 
-/* Settings page may scroll */
+/* Settings page / explicit scroll regions may scroll */
 body:has([data-allow-scroll="true"]) {
   overflow: auto;
+}
+
+[data-allow-scroll="true"] {
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .led-text {

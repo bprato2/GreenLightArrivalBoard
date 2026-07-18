@@ -68,10 +68,8 @@ const byName = new Map(
 );
 
 /**
- * Mini-map corridor centered on the selected departure stop:
- * 5 stations before (upstream) and 1 after (downstream) along travel direction.
- * Inbound (1): before = toward Riverside, after = toward downtown.
- * Outbound (0): before = toward downtown, after = toward Riverside.
+ * Mini-map corridor centered on the selected departure stop (Green-D static table).
+ * Prefer getCorridorWindow from `@/lib/mbta/corridor` for arbitrary routes.
  */
 export function getMiniMapCorridor(
   stopId: string,
@@ -80,14 +78,12 @@ export function getMiniMapCorridor(
   stations: StationInfo[];
   hasContinuation: boolean;
   maxStationIndex: number;
-  /** Parent place-* id for the home marker (may differ from raw stopId). */
   homeStopId: string;
 } {
   const home = resolveStation(stopId) ?? byId.get(TARGET_STOP_ID)!;
   const homeIdx = home.index;
   const before = 5;
   const after = 1;
-  // Stations are indexed Riverside (0) → downtown. Slice stays left-to-right.
   const start =
     directionId === 1
       ? Math.max(0, homeIdx - before)
