@@ -5,7 +5,6 @@ import {
   createAlertAdapter,
   type ArrivalAlertPhase,
 } from "@/lib/alerts/beacon";
-import { TARGET_STATION_NAME, TARGET_STOP_ID } from "@/lib/mbta/stations";
 import type { BoardSettings } from "@/types/settings";
 
 export interface UseArrivalAlertResult {
@@ -17,30 +16,30 @@ export interface UseArrivalAlertResult {
 }
 
 /**
- * Three-phase alert derived from the closest inbound ETA:
- * - idle (phase 0): no train or > 7 min away
- * - pulse (phase 1): green-light window, 3–7 min inclusive
- * - imminent (phase 2): arriving / boarding, 0–2 min inclusive
+ * Three-phase alert derived from the closest ETA:
+ * - idle: no train or outside pulse window
+ * - pulse: green-light window
+ * - imminent: arriving / boarding
  */
 export function useArrivalAlert(
-  closestInboundMinutes: number | null,
+  closestMinutes: number | null,
   settings: BoardSettings,
 ): UseArrivalAlertResult {
   const [forced, setForced] = useState<ArrivalAlertPhase | null>(null);
   const lastPhase = useRef<ArrivalAlertPhase | null>(null);
 
   const computed = useMemo((): ArrivalAlertPhase => {
-    if (closestInboundMinutes === null) return "idle";
-    if (closestInboundMinutes <= settings.alertImminentMinutes) return "imminent";
+    if (closestMinutes === null) return "idle";
+    if (closestMinutes <= settings.alertImminentMinutes) return "imminent";
     if (
-      closestInboundMinutes >= settings.alertPulseMinMinutes &&
-      closestInboundMinutes <= settings.alertPulseMaxMinutes
+      closestMinutes >= settings.alertPulseMinMinutes &&
+      closestMinutes <= settings.alertPulseMaxMinutes
     ) {
       return "pulse";
     }
     return "idle";
   }, [
-    closestInboundMinutes,
+    closestMinutes,
     settings.alertImminentMinutes,
     settings.alertPulseMaxMinutes,
     settings.alertPulseMinMinutes,
@@ -54,16 +53,22 @@ export function useArrivalAlert(
     const adapter = createAlertAdapter(settings.alertWebhookUrl);
     void adapter.onPhaseChange({
       phase,
-      minutesAway: closestInboundMinutes,
+      minutesAway: closestMinutes,
       at: new Date().toISOString(),
-      stationId: TARGET_STOP_ID,
-      stationName: TARGET_STATION_NAME,
+      stationId: settings.stopId,
+      stationName: settings.stopName || settings.stopId,
     });
-  }, [phase, closestInboundMinutes, settings.alertWebhookUrl]);
+  }, [
+    phase,
+    closestMinutes,
+    settings.alertWebhookUrl,
+    settings.stopId,
+    settings.stopName,
+  ]);
 
   return {
     phase,
-    minutesAway: closestInboundMinutes,
+    minutesAway: closestMinutes,
     forcePhase: (p) => setForced(p),
     clearForce: () => setForced(null),
   };

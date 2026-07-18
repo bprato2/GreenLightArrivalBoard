@@ -1,8 +1,8 @@
 /**
  * Pluggable arrival-alert adapters.
  *
- * Visual indicator is always driven by the board; adapters receive state changes
- * so a Home Assistant webhook, ESPHome beacon, or MQTT bridge can be wired later
+ * Board UI (leave banner) is independent; adapters receive phase changes so a
+ * Home Assistant webhook, ESPHome beacon, or MQTT bridge can mirror state
  * without rewriting board UI code.
  */
 

@@ -3,42 +3,107 @@
 import type { CSSProperties } from "react";
 import { AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { ArrivalRow } from "@/components/ArrivalRow";
+import { useRouter } from "next/navigation";
+import { AmtrakPanel } from "@/components/AmtrakPanel";
 import { AnnouncementManager } from "@/components/AnnouncementManager";
+import { AppChrome } from "@/components/AppChrome";
+import { ArrivalRow } from "@/components/ArrivalRow";
+import { BoardRouteControls } from "@/components/BoardRouteControls";
 import { LeaveForStationNow } from "@/components/LeaveForStationNow";
 import { MiniMap } from "@/components/MiniMap";
 import { ServiceFrequency } from "@/components/ServiceFrequency";
 import { StationHeader } from "@/components/StationHeader";
+import { WalkToStation } from "@/components/WalkToStation";
 import { Weather } from "@/components/Weather";
 import { useAnnouncements } from "@/hooks/useAnnouncements";
+import { useArrivalAlert } from "@/hooks/useArrivalAlert";
 import { useClock } from "@/hooks/useClock";
 import { useMbtaSchedules } from "@/hooks/useMbtaSchedules";
 import { useMbtaStream } from "@/hooks/useMbtaStream";
 import { useSettings } from "@/hooks/useSettings";
+import { useWalkToStation } from "@/hooks/useWalkToStation";
 import { useWeather } from "@/hooks/useWeather";
-import { TARGET_STATION_NAME } from "@/lib/mbta/stations";
+import { ROUTE_ID, getDirectionOption } from "@/lib/mbta/boardConfig";
+import { stationDisplayName } from "@/lib/mbta/stations";
+import { getLeaveAdvice } from "@/lib/walk";
 import type { Arrival } from "@/lib/mbta/types";
+import type { TransitMode } from "@/lib/providers/types";
 
 function mergeBoardRows(live: Arrival[], scheduled: Arrival[]): Arrival[] {
   return [...live, ...scheduled];
 }
 
 export function ArrivalBoard() {
-  const { settings, hydrated } = useSettings();
-  const { arrivals, trains, connected, error, nowMs } = useMbtaStream();
-  const { scheduled, schedules } = useMbtaSchedules(arrivals, nowMs);
+  const router = useRouter();
+  const { settings, setSettings, hydrated } = useSettings();
+  const isAmtrak = settings.mode === "amtrak";
+  const isGreenD = settings.routeId === ROUTE_ID;
+  const filter = {
+    stopId: settings.stopId,
+    directionId: settings.directionId,
+    routeId: settings.routeId,
+  };
+  const { arrivals, trains, connected, error, nowMs } = useMbtaStream(filter, {
+    routeColor: settings.routeColor,
+    enabled: !isAmtrak && Boolean(settings.routeId && settings.stopId),
+  });
+  const { scheduled, schedules } = useMbtaSchedules(
+    arrivals,
+    nowMs,
+    settings.stopId,
+    settings.directionId,
+    settings.routeId,
+    settings.routeColor,
+    !isAmtrak && Boolean(settings.routeId && settings.stopId),
+  );
   const boardRows = mergeBoardRows(arrivals, scheduled);
   const { timeLine } = useClock();
-  const weather = useWeather(settings.weatherEnabled);
-  const closestInbound = arrivals[0]?.minutesAway ?? null;
-  const showLeaveNow =
-    closestInbound !== null &&
-    closestInbound >= settings.alertPulseMinMinutes &&
-    closestInbound <= settings.alertPulseMaxMinutes;
+  const weather = useWeather(settings.weatherEnabled && !isAmtrak, settings.stopId);
+  const walk = useWalkToStation(settings.stopId, {
+    auto: !isAmtrak && Boolean(settings.stopId),
+    coords:
+      settings.stopLat || settings.stopLon
+        ? { lat: settings.stopLat, lon: settings.stopLon }
+        : null,
+  });
+  const leaveAdvice = getLeaveAdvice(
+    arrivals.map((a) => a.minutesAway),
+    walk.estimate?.minutes ?? null,
+  );
+  const directionOpt = getDirectionOption(settings.directionId);
+  const stationName =
+    settings.stopName ||
+    stationDisplayName(settings.stopId) ||
+    settings.stopId;
+  const closestMinutes = arrivals[0]?.minutesAway ?? null;
 
-  useAnnouncements(arrivals, settings.announcementsEnabled);
+  useAnnouncements(arrivals, settings.announcementsEnabled && !isAmtrak);
+  useArrivalAlert(closestMinutes, settings);
 
   const glow = settings.ledGlowIntensity;
+
+  const setMode = (mode: TransitMode) => {
+    if (mode === "subway") {
+      setSettings({
+        ...settings,
+        mode,
+        routeId: ROUTE_ID,
+        stopId: "place-newtn",
+        stopName: "Newton Highlands",
+        stopLat: 42.3222,
+        stopLon: -71.2054,
+        routeColor: "#00843d",
+      });
+      return;
+    }
+    setSettings({
+      ...settings,
+      mode,
+      routeId: "",
+      stopId: "",
+      stopName: "",
+    });
+  };
 
   if (!hydrated) {
     return (
@@ -60,90 +125,142 @@ export function ArrivalBoard() {
       <div className="led-scanlines pointer-events-none absolute inset-0 z-20" aria-hidden />
       <div className="led-vignette pointer-events-none absolute inset-0 z-10" aria-hidden />
 
-      <header className="relative z-30 flex shrink-0 items-center justify-between gap-4 px-5 pt-3 pb-1">
-        <div
-          className="led-text text-[clamp(1.35rem,2.8vw,2.1rem)] tabular-nums tracking-wider"
-          style={{ textShadow: `0 0 ${6 + glow * 14}px rgba(255,176,0,${0.4 + glow * 0.4})` }}
-        >
-          {timeLine}
-        </div>
+      <AppChrome
+        mode={settings.mode}
+        appView="board"
+        onModeChange={setMode}
+        onViewChange={(view) => {
+          if (view === "plan") router.push("/plan");
+        }}
+      />
 
-        <div className="flex flex-col items-center gap-1.5">
-          <StationHeader stationName={TARGET_STATION_NAME} />
-          <span className="font-[family-name:var(--font-station)] text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-zinc-400">
-            Green Line · D Branch
-          </span>
-          <span
-            className={`sr-only ${connected ? "text-emerald-500" : "text-red-500/80"}`}
-            aria-live="polite"
-          >
-            {connected ? "Live data connected" : "Disconnected from live data"}
-          </span>
+      {isAmtrak ? (
+        <div className="relative z-30 min-h-0 flex-1 overflow-y-auto" data-allow-scroll="true">
+          <AmtrakPanel />
         </div>
-
-        <div className="min-w-[2.5rem]">
-          {settings.weatherEnabled ? (
-            <Weather data={weather.data} error={weather.error} glow={glow} />
-          ) : (
-            <div className="h-8" />
-          )}
-        </div>
-      </header>
-
-      <main
-        className={`relative z-30 flex min-h-0 flex-1 flex-col px-5 ${
-          settings.miniMapEnabled ? "pb-1" : "pb-2"
-        }`}
-      >
-        <div className="mb-1 flex items-end justify-between border-b border-amber-900/40 pb-1">
-          <span className="led-text text-[0.7rem] uppercase tracking-[0.3em] text-amber-600/75">
-            Inbound arrivals
-          </span>
-          <Link
-            href="/settings"
-            className="led-text text-[0.65rem] uppercase tracking-[0.2em] text-amber-800/80 hover:text-amber-500"
-          >
-            Settings
-          </Link>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-hidden">
-          {error && boardRows.length === 0 && (
-            <div className="led-text py-8 text-center text-amber-600/90">{error}</div>
-          )}
-          {!error && boardRows.length === 0 && (
-            <div className="led-text py-8 text-center text-amber-700/70">
-              Waiting for predictions…
+      ) : (
+        <>
+          <header className="relative z-30 flex shrink-0 items-center justify-between gap-4 px-5 pt-3 pb-1">
+            <div
+              className="led-text text-[clamp(1.35rem,2.8vw,2.1rem)] tabular-nums tracking-wider"
+              style={{
+                textShadow: `0 0 ${6 + glow * 14}px rgba(255,176,0,${0.4 + glow * 0.4})`,
+              }}
+            >
+              {timeLine}
             </div>
-          )}
-          <AnimatePresence initial={false}>
-            {boardRows.map((arrival, index) => (
-              <ArrivalRow
-                key={arrival.id}
-                arrival={arrival}
-                index={index}
-                glow={glow}
+
+            <div className="flex flex-col items-center gap-1.5">
+              <StationHeader
+                stationName={stationName || "Select station"}
+                accentColor={settings.routeColor}
               />
-            ))}
-          </AnimatePresence>
-        </div>
+              <span className="font-[family-name:var(--font-station)] text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                MBTA · {directionOpt.label}
+              </span>
+              <span
+                className={`sr-only ${connected ? "text-emerald-500" : "text-red-500/80"}`}
+                aria-live="polite"
+              >
+                {connected ? "Live data connected" : "Disconnected from live data"}
+              </span>
+            </div>
 
-        {error && boardRows.length > 0 && (
-          <div className="led-text pt-1 text-[0.65rem] text-amber-700/70">{error}</div>
-        )}
-      </main>
+            <div className="min-w-[2.5rem]">
+              {settings.weatherEnabled ? (
+                <Weather data={weather.data} error={weather.error} glow={glow} />
+              ) : (
+                <div className="h-8" />
+              )}
+            </div>
+          </header>
 
-      <ServiceFrequency schedules={schedules} nowMs={nowMs} glow={glow} />
+          <div className="relative z-30 flex shrink-0 items-center justify-between gap-3 border-b border-amber-900/30 px-5 pb-2">
+            <BoardRouteControls
+              settings={settings}
+              compact
+              hideMode
+              onChange={(patch) => setSettings({ ...settings, ...patch })}
+            />
+            <div className="flex shrink-0 items-center gap-2">
+              {settings.stopId && (
+                <WalkToStation
+                  stationId={settings.stopId}
+                  stationName={settings.stopName}
+                  walk={walk}
+                />
+              )}
+              <Link
+                href="/settings"
+                className="led-text shrink-0 text-[0.65rem] uppercase tracking-[0.2em] text-amber-800/80 hover:text-amber-500"
+              >
+                Settings
+              </Link>
+            </div>
+          </div>
 
-      <LeaveForStationNow visible={showLeaveNow} />
+          <main
+            className={`relative z-30 flex min-h-0 flex-1 flex-col px-5 ${
+              settings.miniMapEnabled && isGreenD ? "pb-1" : "pb-2"
+            }`}
+          >
+            <div className="mb-1 flex items-end justify-between border-b border-amber-900/40 pb-1">
+              <span className="led-text text-[0.7rem] uppercase tracking-[0.3em] text-amber-600/75">
+                {directionOpt.label} arrivals
+              </span>
+            </div>
 
-      {settings.miniMapEnabled && (
-        <section className="relative z-30 h-[20vh] min-h-[120px] max-h-[180px] shrink-0 border-t border-amber-900/30 bg-gradient-to-b from-transparent to-emerald-950/20">
-          <MiniMap trains={trains} glow={glow} />
-        </section>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {error && boardRows.length === 0 && (
+                <div className="led-text py-8 text-center text-amber-600/90">{error}</div>
+              )}
+              {!error && boardRows.length === 0 && (
+                <div className="led-text py-8 text-center text-amber-700/70">
+                  {settings.stopId
+                    ? "Waiting for predictions…"
+                    : "Select a route and station"}
+                </div>
+              )}
+              <AnimatePresence initial={false}>
+                {boardRows.map((arrival, index) => (
+                  <ArrivalRow
+                    key={arrival.id}
+                    arrival={arrival}
+                    index={index}
+                    glow={glow}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+
+            {error && boardRows.length > 0 && (
+              <div className="led-text pt-1 text-[0.65rem] text-amber-700/70">{error}</div>
+            )}
+          </main>
+
+          <ServiceFrequency
+            schedules={schedules}
+            arrivals={boardRows}
+            nowMs={nowMs}
+            glow={glow}
+          />
+
+          <LeaveForStationNow advice={leaveAdvice} />
+
+          {settings.miniMapEnabled && isGreenD && (
+            <section className="relative z-30 h-[22vh] min-h-[132px] max-h-[200px] shrink-0 border-t border-amber-900/30 bg-gradient-to-b from-transparent to-emerald-950/20">
+              <MiniMap
+                trains={trains}
+                glow={glow}
+                stopId={settings.stopId}
+                directionId={settings.directionId}
+              />
+            </section>
+          )}
+
+          <AnnouncementManager active={settings.announcementsEnabled} />
+        </>
       )}
-
-      <AnnouncementManager active={settings.announcementsEnabled} />
     </div>
   );
 }

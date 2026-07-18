@@ -95,6 +95,8 @@ export interface Arrival {
   mbtaStatus: string | null;
   /** Distinguishes live predictions from static schedule rows. */
   rowKind?: BoardRowKind;
+  /** Route accent color for the row pip (e.g. Green Line green). */
+  routeColor?: string;
 }
 
 export interface ScheduleAttributes {
