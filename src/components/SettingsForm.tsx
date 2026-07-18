@@ -2,11 +2,11 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { BoardRouteControls } from "@/components/BoardRouteControls";
 import { createAlertAdapter } from "@/lib/alerts/beacon";
 import { playMbtaChime, unlockAudio } from "@/lib/audio/chime";
 import { buildArrivalAnnouncement, speakAnnouncement } from "@/lib/audio/speech";
 import { useSettings } from "@/hooks/useSettings";
-import { TARGET_STATION_NAME, TARGET_STOP_ID } from "@/lib/mbta/stations";
 import type { BoardSettings } from "@/types/settings";
 
 export function SettingsForm() {
@@ -85,12 +85,16 @@ export function SettingsForm() {
     window.setTimeout(() => setSavedFlash(false), 1600);
   };
 
+  const stationName = draft.stopName || draft.stopId;
+
   const testAnnouncement = async () => {
     setTestStatus("Playing chime + speech…");
     await unlockAudio();
     await playMbtaChime();
     await new Promise((r) => setTimeout(r, 400));
-    await speakAnnouncement(buildArrivalAnnouncement("Government Center"));
+    await speakAnnouncement(
+      buildArrivalAnnouncement(draft.directionId === 1 ? "Union Square" : "Riverside"),
+    );
     setTestStatus("Announcement finished");
   };
 
@@ -101,24 +105,24 @@ export function SettingsForm() {
       phase: "pulse",
       minutesAway: 5,
       at: new Date().toISOString(),
-      stationId: TARGET_STOP_ID,
-      stationName: TARGET_STATION_NAME,
+      stationId: draft.stopId,
+      stationName,
     });
     await new Promise((r) => setTimeout(r, 1200));
     await adapter.onPhaseChange({
       phase: "imminent",
       minutesAway: 1,
       at: new Date().toISOString(),
-      stationId: TARGET_STOP_ID,
-      stationName: TARGET_STATION_NAME,
+      stationId: draft.stopId,
+      stationName,
     });
     await new Promise((r) => setTimeout(r, 800));
     await adapter.onPhaseChange({
       phase: "idle",
       minutesAway: null,
       at: new Date().toISOString(),
-      stationId: TARGET_STOP_ID,
-      stationName: TARGET_STATION_NAME,
+      stationId: draft.stopId,
+      stationName,
     });
     setTestStatus(
       draft.alertWebhookUrl
@@ -138,6 +142,11 @@ export function SettingsForm() {
             ← Board
           </Link>
         </div>
+
+        <BoardRouteControls
+          settings={draft}
+          onChange={(routePatch) => setDraft((d) => ({ ...d, ...routePatch }))}
+        />
 
         <Toggle
           label="Announcements"
@@ -179,7 +188,9 @@ export function SettingsForm() {
             onChange={(v) => patch("alertImminentMinutes", v)}
           />
           <p className="mt-2 text-xs text-zinc-500">
-            Default: pulse when 3–7 minutes away; solid green when ≤ 2 minutes.
+            Used for webhook / beacon phases. The on-screen leave banner uses walk
+            time vs train ETA: it only prompts for a catchable train, and shows a
+            miss notice when the soonest one is already too close.
           </p>
         </fieldset>
 

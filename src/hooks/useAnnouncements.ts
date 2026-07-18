@@ -78,15 +78,15 @@ export function useAnnouncements(
   useEffect(() => {
     if (!enabled) return;
 
-    const inbound = arrivals.filter((a) => a.directionId === 1 && a.rowKind !== "scheduled");
-    const liveTrips = new Set(inbound.map((a) => a.tripId ?? a.id));
+    const live = arrivals.filter((a) => a.rowKind !== "scheduled");
+    const liveTrips = new Set(live.map((a) => a.tripId ?? a.id));
 
     for (const key of announcedIds.current) {
       const trip = key.replace(/:(3min|arriving)$/, "");
       if (!liveTrips.has(trip)) announcedIds.current.delete(key);
     }
 
-    for (const arrival of inbound) {
+    for (const arrival of live) {
       const tripKey = arrival.tripId ?? arrival.id;
       const prev = prevMinutes.current.get(tripKey);
       const current = arrival.minutesAway;

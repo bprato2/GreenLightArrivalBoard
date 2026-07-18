@@ -14,24 +14,39 @@ const ABBREVIATIONS: Record<string, string> = {
   "brookline village": "BRK VILLAGE",
   "hynes convention center": "HYNES",
   "park street": "PARK ST",
-  "riverside": "RIVERSIDE",
+  riverside: "RIVERSIDE",
 };
 
-/** Normalize inbound terminating headsigns — GLX D-branch trips typically end at Union Square. */
-export function normalizeInboundHeadsign(raw: string | null | undefined): string {
+/** Normalize terminating headsigns for the selected direction. */
+export function normalizeHeadsign(
+  raw: string | null | undefined,
+  directionId = 1,
+): string {
   const trimmed = raw?.trim() ?? "";
-  if (!trimmed) return "UNION SQ";
+  const fallback = directionId === 1 ? "Union Square" : "Riverside";
+  if (!trimmed) return fallback;
 
   const lower = trimmed.toLowerCase();
-  if (lower.includes("government center") || lower.includes("gov")) return "Union Square";
-  if (lower.includes("union square") || lower.includes("union sq")) return "Union Square";
+  if (directionId === 1) {
+    if (lower.includes("government center") || lower.includes("gov")) {
+      return "Union Square";
+    }
+    if (lower.includes("union square") || lower.includes("union sq")) {
+      return "Union Square";
+    }
+  }
 
   return trimmed;
 }
 
+/** @deprecated Use normalizeHeadsign(raw, 1). */
+export function normalizeInboundHeadsign(raw: string | null | undefined): string {
+  return normalizeHeadsign(raw, 1);
+}
+
 /** Format a headsign like an MBTA LED countdown sign (ALL-CAPS, abbreviated). */
 export function formatMbtaHeadsign(raw: string | null | undefined): string {
-  const normalized = normalizeInboundHeadsign(raw);
+  const normalized = normalizeHeadsign(raw);
   const lower = normalized.toLowerCase();
 
   for (const [key, abbrev] of Object.entries(ABBREVIATIONS)) {

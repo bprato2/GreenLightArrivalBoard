@@ -1,14 +1,14 @@
+import { GREEN_LINE_COLOR, ROUTE_ID, type DirectionId } from "./boardConfig";
 import {
-  INBOUND_DIRECTION_ID,
-  MINI_MAP_MAX_STATION_INDEX,
-  MINI_MAP_STATIONS,
+  getMiniMapCorridor,
   resolveStation,
   resolveStationByName,
   stationIndex,
   stationName,
   TARGET_STOP_ID,
+  type StationInfo,
 } from "./stations";
-import { normalizeInboundHeadsign } from "./headsign";
+import { normalizeHeadsign } from "./headsign";
 import type {
   Arrival,
   ArrivalStatus,
@@ -24,24 +24,37 @@ import type {
 
 const MBTA_BASE = "https://api-v3.mbta.com";
 
+export interface BoardFilter {
+  stopId: string;
+  directionId: DirectionId;
+  routeId: string;
+}
+
 export function getApiKey(): string {
   return process.env.NEXT_PUBLIC_MBTA_API_KEY?.trim() ?? "";
 }
 
-export function buildPredictionsUrl(apiKey: string): string {
+export function buildPredictionsUrl(
+  apiKey: string,
+  filter: BoardFilter = {
+    stopId: TARGET_STOP_ID,
+    directionId: 1,
+    routeId: ROUTE_ID,
+  },
+): string {
   const params = new URLSearchParams({
-    "filter[stop]": TARGET_STOP_ID,
-    "filter[route]": "Green-D",
-    "filter[direction_id]": INBOUND_DIRECTION_ID,
+    "filter[stop]": filter.stopId,
+    "filter[route]": filter.routeId,
+    "filter[direction_id]": String(filter.directionId),
     include: "vehicle,trip,stop",
     api_key: apiKey,
   });
   return `${MBTA_BASE}/predictions?${params.toString()}`;
 }
 
-export function buildVehiclesUrl(apiKey: string): string {
+export function buildVehiclesUrl(apiKey: string, routeId: string = ROUTE_ID): string {
   const params = new URLSearchParams({
-    "filter[route]": "Green-D",
+    "filter[route]": routeId,
     include: "stop,trip",
     api_key: apiKey,
   });
@@ -172,6 +185,8 @@ function parentStopId(stopId: string | null, stops: Map<string, StopResource>): 
 function vehicleMapPosition(
   vehicle: VehicleResource,
   stops: Map<string, StopResource>,
+  corridor: StationInfo[],
+  maxStationIndex: number,
 ): { stationIndex: number; progress: number } | null {
   const directionId = vehicle.attributes.direction_id ?? 0;
   const location = describeVehicleLocation(vehicle, stops);
@@ -183,13 +198,15 @@ function vehicleMapPosition(
     const fromCoords = positionFromLatLon(
       vehicle.attributes.latitude,
       vehicle.attributes.longitude,
+      corridor,
     );
     if (!fromCoords) return null;
     stationIndexValue = fromCoords.stationIndex;
     progress = fromCoords.progress;
   }
 
-  if (stationIndexValue > MINI_MAP_MAX_STATION_INDEX) return null;
+  if (stationIndexValue > maxStationIndex) return null;
+  if (corridor.length > 0 && stationIndexValue < corridor[0]!.index) return null;
 
   const status = vehicle.attributes.current_status;
   if (status === "IN_TRANSIT_TO" || status === "INCOMING_AT") {
@@ -211,20 +228,21 @@ function vehicleMapPosition(
 function positionFromLatLon(
   lat: number | null,
   lon: number | null,
+  corridor: StationInfo[],
 ): { stationIndex: number; progress: number } | null {
-  if (lat === null || lon === null) return null;
+  if (lat === null || lon === null || corridor.length < 2) return null;
 
   let bestDist = Infinity;
-  let bestIndex = 0;
+  let bestIndex = corridor[0]!.index;
   let bestProgress = 0;
 
-  for (let i = 0; i < MINI_MAP_STATIONS.length - 1; i++) {
-    const a = MINI_MAP_STATIONS[i]!;
-    const b = MINI_MAP_STATIONS[i + 1]!;
+  for (let i = 0; i < corridor.length - 1; i++) {
+    const a = corridor[i]!;
+    const b = corridor[i + 1]!;
     const { t, dist } = projectPointOnSegment(lat, lon, a.lat, a.lon, b.lat, b.lon);
     if (dist < bestDist) {
       bestDist = dist;
-      bestIndex = i;
+      bestIndex = a.index;
       bestProgress = t;
     }
   }
@@ -320,12 +338,22 @@ function classifyStatus(
   return { status, isDelayed, isApproaching };
 }
 
-/** Derive sorted inbound arrivals + map trains from the live collection. */
+/** Derive sorted arrivals + map trains from the live collection. */
 export function deriveBoardState(
   collection: StreamCollection,
   nowMs: number,
+  filter: BoardFilter = {
+    stopId: TARGET_STOP_ID,
+    directionId: 1,
+    routeId: ROUTE_ID,
+  },
+  routeColor: string = GREEN_LINE_COLOR,
 ): { arrivals: Arrival[]; trains: MapTrain[] } {
   const arrivals: Arrival[] = [];
+  const isGreenD = filter.routeId === ROUTE_ID;
+  const corridor = isGreenD
+    ? getMiniMapCorridor(filter.stopId)
+    : { stations: [] as StationInfo[], hasContinuation: false, maxStationIndex: -1 };
 
   for (const prediction of collection.predictions.values()) {
     const attrs = prediction.attributes;
@@ -350,14 +378,17 @@ export function deriveBoardState(
       attrs.status,
     );
 
-    const location = describeVehicleLocation(vehicle, collection.stops);
+    const location = isGreenD
+      ? describeVehicleLocation(vehicle, collection.stops)
+      : { label: null as string | null, stationIndex: null as number | null, progress: 0 };
     const directionId =
       trip?.attributes.direction_id ?? attrs.direction_id ?? 0;
-    if (directionId !== 1) continue;
+    if (directionId !== filter.directionId) continue;
 
-    const headsign = normalizeInboundHeadsign(
-      trip?.attributes.headsign || attrs.status || "Union Square",
-    );
+    const rawHeadsign = trip?.attributes.headsign || attrs.status || "Train";
+    const headsign = isGreenD
+      ? normalizeHeadsign(rawHeadsign, filter.directionId)
+      : rawHeadsign;
 
     arrivals.push({
       id: prediction.id,
@@ -376,20 +407,30 @@ export function deriveBoardState(
       isApproaching,
       mbtaStatus: attrs.status,
       rowKind: "live",
+      routeColor,
     });
   }
 
   arrivals.sort((a, b) => a.etaMs - b.etaMs);
 
   const trains: MapTrain[] = [];
+  if (!isGreenD) {
+    return { arrivals, trains };
+  }
+
   const seenVehicleIds = new Set<string>();
 
   const addTrain = (vehicle: VehicleResource) => {
     if (seenVehicleIds.has(vehicle.id)) return;
     const directionId = vehicle.attributes.direction_id ?? 0;
-    if (directionId !== 1) return;
+    if (directionId !== filter.directionId) return;
 
-    const position = vehicleMapPosition(vehicle, collection.stops);
+    const position = vehicleMapPosition(
+      vehicle,
+      collection.stops,
+      corridor.stations,
+      corridor.maxStationIndex,
+    );
     if (!position) return;
 
     seenVehicleIds.add(vehicle.id);
@@ -407,7 +448,6 @@ export function deriveBoardState(
     addTrain(vehicle);
   }
 
-  // Also pick up vehicles linked to live predictions (included via prediction SSE).
   for (const prediction of collection.predictions.values()) {
     const vehicleId = relatedId(prediction, "vehicle");
     if (!vehicleId) continue;
