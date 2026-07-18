@@ -37,7 +37,8 @@ export function BoardRouteControls({
 }: BoardRouteControlsProps) {
   const [routes, setRoutes] = useState<TransitRoute[]>([]);
   const [stops, setStops] = useState<TransitStop[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loadingRoutes, setLoadingRoutes] = useState(false);
+  const [loadingStops, setLoadingStops] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export function BoardRouteControls({
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    setLoadingRoutes(true);
     setError(null);
     void fetchRoutesForMode(settings.mode)
       .then((list) => {
@@ -59,6 +60,7 @@ export function BoardRouteControls({
             routeId: list[0].id,
             routeColor: list[0].color,
             stopId: "",
+            stopName: "",
           });
         }
       })
@@ -66,7 +68,7 @@ export function BoardRouteControls({
         if (!cancelled) setError("Could not load routes");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadingRoutes(false);
       });
     return () => {
       cancelled = true;
@@ -80,6 +82,8 @@ export function BoardRouteControls({
       return;
     }
     let cancelled = false;
+    setLoadingStops(true);
+    setError(null);
     void fetchStopsForRoute(settings.routeId)
       .then((list) => {
         if (cancelled) return;
@@ -95,7 +99,13 @@ export function BoardRouteControls({
         }
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load stops");
+        if (!cancelled) {
+          setStops([]);
+          setError("Could not load stops");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingStops(false);
       });
     return () => {
       cancelled = true;
@@ -143,7 +153,7 @@ export function BoardRouteControls({
     ? "led-text text-[0.55rem] uppercase tracking-[0.2em] text-amber-700/80"
     : "text-zinc-400 text-sm";
   const fieldSelect = compact
-    ? `${selectClass} text-[0.65rem] uppercase tracking-wide max-w-[9.5rem]`
+    ? `${selectClass} text-[0.65rem] uppercase tracking-wide min-w-[7rem] max-w-[14rem]`
     : selectClass;
 
   const fields = (
@@ -172,7 +182,7 @@ export function BoardRouteControls({
             <select
               className={fieldSelect}
               value={settings.routeId}
-              disabled={loading || routes.length === 0}
+              disabled={loadingRoutes || routes.length === 0}
               onChange={(e) => setRoute(e.target.value)}
             >
               {routes.map((r) => (
@@ -187,10 +197,18 @@ export function BoardRouteControls({
             <span className={labelClass}>Station</span>
             <select
               className={fieldSelect}
-              value={settings.stopId}
-              disabled={stops.length === 0}
+              value={
+                stops.some((s) => s.id === settings.stopId) ? settings.stopId : ""
+              }
+              disabled={loadingStops || stops.length === 0}
               onChange={(e) => setStation(e.target.value)}
             >
+              {loadingStops && (
+                <option value="">Loading…</option>
+              )}
+              {!loadingStops && stops.length === 0 && (
+                <option value="">No stations</option>
+              )}
               {stops.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
