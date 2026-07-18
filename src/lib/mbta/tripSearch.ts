@@ -45,10 +45,6 @@ interface ScheduleRow {
   timeIso: string;
 }
 
-function apiKeyParam(apiKey: string): string {
-  return apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : "";
-}
-
 async function fetchSchedulesForStop(
   stopId: string,
   date: string,

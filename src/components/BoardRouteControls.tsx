@@ -267,7 +267,6 @@ export function BoardRouteControls({
               routeStops={stops}
               loadingRouteStops={loadingStops}
               compact={compact}
-              disabled={settings.mode === "amtrak"}
               onSelect={setStationSelection}
             />
           </div>
