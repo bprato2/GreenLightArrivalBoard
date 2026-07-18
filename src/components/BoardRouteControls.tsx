@@ -5,13 +5,19 @@ import {
   DepartureStationSelect,
   type DepartureStationSelection,
 } from "@/components/DepartureStationSelect";
+import { RouteSelect, type RouteSelection } from "@/components/RouteSelect";
 import {
-  DIRECTIONS,
-  GREEN_LINE_ALL_ID,
   coerceDirection,
+  directionsForRoute,
   type DirectionId,
 } from "@/lib/mbta/boardConfig";
-import { fetchRoutesForMode, fetchStopsForRoute, fetchNetworkStopCatalog } from "@/lib/mbta/catalog";
+import {
+  fetchRoutesForMode,
+  fetchStopsForRoute,
+  fetchNetworkStopCatalog,
+  fetchNetworkRouteCatalog,
+  fetchRouteById,
+} from "@/lib/mbta/catalog";
 import type { TransitMode, TransitRoute, TransitStop } from "@/lib/providers/types";
 import type { BoardSettings } from "@/types/settings";
 
@@ -44,11 +50,29 @@ export function DirectionSelect({
   onChange: (patch: Partial<BoardSettings>) => void;
   compact?: boolean;
 }) {
+  const [options, setOptions] = useState(() =>
+    directionsForRoute(null),
+  );
+
+  useEffect(() => {
+    if (!settings.routeId || settings.mode === "amtrak") {
+      setOptions(directionsForRoute(null));
+      return;
+    }
+    let cancelled = false;
+    void fetchRouteById(settings.routeId).then((route) => {
+      if (!cancelled) setOptions(directionsForRoute(route));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.routeId, settings.mode]);
+
   const labelClass = compact
     ? "led-text text-[0.55rem] uppercase tracking-[0.2em] text-amber-700/80"
     : "text-zinc-400 text-sm";
   const fieldSelect = compact
-    ? `${selectClass} text-[0.65rem] uppercase tracking-wide w-full min-w-[7rem]`
+    ? `${selectClass} text-[0.65rem] uppercase tracking-wide w-full min-w-[7rem] max-w-[16rem]`
     : selectClass;
 
   return (
@@ -61,7 +85,7 @@ export function DirectionSelect({
           onChange({ directionId: Number(e.target.value) as DirectionId })
         }
       >
-        {DIRECTIONS.map((d) => (
+        {options.map((d) => (
           <option key={d.id} value={d.id}>
             {d.label}
           </option>
@@ -85,9 +109,10 @@ export function BoardRouteControls({
   const [loadingStops, setLoadingStops] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Warm the all-stations catalog in the background.
+  // Warm network catalogs in the background.
   useEffect(() => {
     void fetchNetworkStopCatalog().catch(() => {});
+    void fetchNetworkRouteCatalog().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -179,13 +204,23 @@ export function BoardRouteControls({
     onChange({ mode, routeId: "", stopId: "", stopName: "" });
   };
 
-  const setRoute = (routeId: string) => {
-    const route = routes.find((r) => r.id === routeId);
+  const setRouteSelection = (selection: RouteSelection) => {
+    if (selection.keepStop && settings.stopId) {
+      onChange({
+        mode: selection.mode,
+        routeId: selection.routeId,
+        routeColor: selection.routeColor,
+      });
+      return;
+    }
     onChange({
-      routeId,
-      routeColor: route?.color ?? settings.routeColor,
+      mode: selection.mode,
+      routeId: selection.routeId,
+      routeColor: selection.routeColor,
       stopId: "",
       stopName: "",
+      stopLat: 0,
+      stopLon: 0,
     });
   };
 
@@ -238,25 +273,18 @@ export function BoardRouteControls({
 
       {settings.mode !== "amtrak" && (
         <>
-          <label className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-0.5">
             <span className={labelClass}>Route</span>
-            <select
-              className={fieldSelect}
-              value={settings.routeId}
-              disabled={loadingRoutes || routes.length === 0}
-              onChange={(e) => setRoute(e.target.value)}
-            >
-              {routes.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.id === GREEN_LINE_ALL_ID
-                    ? "Green Line (all)"
-                    : r.shortName
-                      ? `${r.shortName} · ${r.label}`
-                      : r.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <RouteSelect
+              mode={settings.mode}
+              routeId={settings.routeId}
+              stopId={settings.stopId}
+              stopName={settings.stopName}
+              compact={compact}
+              disabled={loadingRoutes && routes.length === 0}
+              onSelect={setRouteSelection}
+            />
+          </div>
 
           <div className="flex flex-col gap-0.5">
             <span className={labelClass}>Departure Station</span>
@@ -300,8 +328,9 @@ export function BoardRouteControls({
       <div className="mt-2 flex flex-col gap-3">{fields}</div>
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
       <p className="mt-2 text-xs text-zinc-500">
-        Current-line stations stay on top. Scroll further for the full network
-        (subway, commuter rail, bus) — picking one jumps mode and route for you.
+        With a departure station selected, routes that stop there appear first.
+        Below that are other routes in the current mode (subway / CR / bus). Use
+        search to find routes in other modes.
       </p>
     </fieldset>
   );

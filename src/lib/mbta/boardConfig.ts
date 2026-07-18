@@ -62,8 +62,36 @@ export function isDirectionId(value: unknown): value is DirectionId {
   return value === 0 || value === 1;
 }
 
-export function getDirectionOption(directionId: DirectionId): DirectionOption {
-  return DIRECTIONS.find((d) => d.id === directionId) ?? DIRECTIONS[0]!;
+/**
+ * Build inbound/outbound picker labels using a route's MBTA termini when
+ * available, e.g. "Inbound · Union Square" / "Outbound · Riverside".
+ */
+export function directionsForRoute(route?: {
+  directionNames?: string[] | null;
+  directionDestinations?: string[] | null;
+} | null): DirectionOption[] {
+  const termini = route?.directionDestinations ?? null;
+
+  return ([1, 0] as DirectionId[]).map((id) => {
+    const fallback = DIRECTIONS.find((d) => d.id === id)!;
+    const terminus = termini?.[id]?.trim() || "";
+    const label = terminus ? `${fallback.label} · ${terminus}` : fallback.label;
+    const towardLabel = terminus
+      ? `Toward ${terminus}`
+      : fallback.towardLabel;
+    return { id, label, towardLabel };
+  });
+}
+
+export function getDirectionOption(
+  directionId: DirectionId,
+  route?: {
+    directionNames?: string[] | null;
+    directionDestinations?: string[] | null;
+  } | null,
+): DirectionOption {
+  const options = directionsForRoute(route);
+  return options.find((d) => d.id === directionId) ?? options[0]!;
 }
 
 /** Keep direction on the known catalog; stop/route validated against live lists. */

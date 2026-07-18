@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,10 +30,11 @@ import {
   ROUTE_ID,
   getDirectionOption,
 } from "@/lib/mbta/boardConfig";
+import { fetchRouteById } from "@/lib/mbta/catalog";
 import { stationDisplayName } from "@/lib/mbta/stations";
 import { getLeaveAdvice } from "@/lib/walk";
 import type { Arrival } from "@/lib/mbta/types";
-import type { TransitMode } from "@/lib/providers/types";
+import type { TransitMode, TransitRoute } from "@/lib/providers/types";
 
 function mergeBoardRows(live: Arrival[], scheduled: Arrival[]): Arrival[] {
   return [...live, ...scheduled];
@@ -87,7 +89,21 @@ export function ArrivalBoard() {
     arrivals.map((a) => a.minutesAway),
     walk.estimate?.minutes ?? null,
   );
-  const directionOpt = getDirectionOption(settings.directionId);
+  const [routeMeta, setRouteMeta] = useState<TransitRoute | null>(null);
+  useEffect(() => {
+    if (!settings.routeId || isAmtrak) {
+      setRouteMeta(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchRouteById(settings.routeId).then((route) => {
+      if (!cancelled) setRouteMeta(route);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.routeId, isAmtrak]);
+  const directionOpt = getDirectionOption(settings.directionId, routeMeta);
   const stationName =
     settings.stopName ||
     stationDisplayName(settings.stopId) ||
@@ -100,10 +116,7 @@ export function ArrivalBoard() {
         ? `Green Line ${settings.routeId.replace("Green-", "")}`
         : settings.routeId || "Line";
 
-const { needsGesture, enableFromGesture } = useAnnouncements(
-  arrivals,
-  settings.announcementsEnabled && !isAmtrak,
-);
+useAnnouncements(arrivals, settings.announcementsEnabled && !isAmtrak);
 useArrivalAlert(closestMinutes, settings);
 
   const glow = settings.ledGlowIntensity;
@@ -297,11 +310,6 @@ useArrivalAlert(closestMinutes, settings);
           <AnnouncementManager active={settings.announcementsEnabled} />
         </>
       )}
-<AnnouncementManager
-  active={settings.announcementsEnabled}
-  needsGesture={needsGesture}
-  onEnable={enableFromGesture}
-/>
     </div>
   );
 }

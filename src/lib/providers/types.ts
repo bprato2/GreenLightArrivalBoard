@@ -29,6 +29,10 @@ export interface TransitRoute {
   color: string;
   /** GTFS route type: 0 light rail, 1 heavy rail, 2 CR, 3 bus, 4 ferry. */
   type?: number;
+  /** MBTA direction_names indexed by direction_id (0 / 1). */
+  directionNames?: string[];
+  /** MBTA direction_destinations (termini) indexed by direction_id. */
+  directionDestinations?: string[];
 }
 
 /** What the board needs to render route pickers for one transit system. */

@@ -4,6 +4,7 @@
 
 import {
   GREEN_LINE_ALL_ID,
+  GREEN_LINE_BRANCH_IDS,
   GREEN_LINE_COLOR,
   expandRouteFilter,
 } from "@/lib/mbta/boardConfig";
@@ -12,6 +13,152 @@ import type { TransitMode, TransitRoute, TransitStop } from "@/lib/providers/typ
 import { routeTypesForMode, TRANSIT_MODES } from "@/lib/providers/types";
 
 const MBTA_BASE = "https://api-v3.mbta.com";
+
+/** A route with mode metadata (for the all-routes / at-station pickers). */
+export interface NetworkRouteEntry {
+  key: string;
+  mode: TransitMode;
+  modeLabel: string;
+  routeId: string;
+  routeLabel: string;
+  routeShortName?: string;
+  routeColor: string;
+}
+
+function modeFromRouteType(type: number | undefined): TransitMode {
+  if (type === 2) return "commuter_rail";
+  if (type === 3) return "bus";
+  return "subway";
+}
+
+function toNetworkRouteEntry(
+  route: TransitRoute,
+  mode?: TransitMode,
+): NetworkRouteEntry {
+  const resolved = mode ?? modeFromRouteType(route.type);
+  return {
+    key: `${resolved}::${route.id}`,
+    mode: resolved,
+    modeLabel: modeLabel(resolved),
+    routeId: route.id,
+    routeLabel: routeDisplayName(route),
+    routeShortName: route.shortName,
+    routeColor: route.color,
+  };
+}
+
+function mapRouteResource(r: MbtaRouteResource): TransitRoute {
+  return {
+    id: r.id,
+    label: r.attributes.long_name || r.attributes.short_name || r.id,
+    shortName: r.attributes.short_name ?? undefined,
+    color: r.attributes.color ? `#${r.attributes.color}` : "#888888",
+    type: r.attributes.type,
+    directionNames: r.attributes.direction_names ?? undefined,
+    directionDestinations: r.attributes.direction_destinations ?? undefined,
+  };
+}
+
+let networkRouteCatalogPromise: Promise<NetworkRouteEntry[]> | null = null;
+
+/** All subway / CR / bus routes (session-cached). */
+export function fetchNetworkRouteCatalog(): Promise<NetworkRouteEntry[]> {
+  if (!networkRouteCatalogPromise) {
+    networkRouteCatalogPromise = buildNetworkRouteCatalog().catch((err) => {
+      networkRouteCatalogPromise = null;
+      throw err;
+    });
+  }
+  return networkRouteCatalogPromise;
+}
+
+async function buildNetworkRouteCatalog(): Promise<NetworkRouteEntry[]> {
+  const modes: TransitMode[] = ["subway", "commuter_rail", "bus"];
+  const entries: NetworkRouteEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const mode of modes) {
+    const routes = await fetchRoutesForMode(mode);
+    for (const route of routes) {
+      const entry = toNetworkRouteEntry(route, mode);
+      if (seen.has(entry.key)) continue;
+      seen.add(entry.key);
+      entries.push(entry);
+    }
+  }
+
+  entries.sort(
+    (a, b) =>
+      modes.indexOf(a.mode) - modes.indexOf(b.mode) ||
+      a.routeLabel.localeCompare(b.routeLabel),
+  );
+  return entries;
+}
+
+/** Routes that serve a given stop (any mode). */
+export async function fetchRoutesAtStop(
+  stopId: string,
+): Promise<NetworkRouteEntry[]> {
+  if (!stopId) return [];
+  const apiKey = getApiKey();
+  const url =
+    `${MBTA_BASE}/routes?filter[stop]=${encodeURIComponent(stopId)}` +
+    `&fields[route]=short_name,long_name,color,type` +
+    apiKeyParam(apiKey);
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Routes-at-stop HTTP ${res.status}`);
+
+  const body = (await res.json()) as { data: MbtaRouteResource[] };
+  const routes = (body.data ?? []).map(mapRouteResource);
+  const entries = routes.map((r) => toNetworkRouteEntry(r));
+
+  // Offer Green Line (all) when any Green branch serves this stop.
+  const hasGreenBranch = entries.some((e) => e.routeId.startsWith("Green-"));
+  const hasGreenAll = entries.some((e) => e.routeId === GREEN_LINE_ALL_ID);
+  if (hasGreenBranch && !hasGreenAll) {
+    const firstGreen = entries.find((e) => e.routeId.startsWith("Green-"));
+    entries.unshift({
+      key: `subway::${GREEN_LINE_ALL_ID}`,
+      mode: "subway",
+      modeLabel: modeLabel("subway"),
+      routeId: GREEN_LINE_ALL_ID,
+      routeLabel: "Green Line (all)",
+      routeShortName: "Green",
+      routeColor: firstGreen?.routeColor ?? GREEN_LINE_COLOR,
+    });
+  }
+
+  // Prefer Green Line (all), then B/C/D/E, then other routes.
+  const greenOrder = [GREEN_LINE_ALL_ID, ...GREEN_LINE_BRANCH_IDS];
+  entries.sort((a, b) => {
+    const ai = greenOrder.indexOf(a.routeId as (typeof greenOrder)[number]);
+    const bi = greenOrder.indexOf(b.routeId as (typeof greenOrder)[number]);
+    if (ai >= 0 || bi >= 0) {
+      if (ai < 0) return 1;
+      if (bi < 0) return -1;
+      return ai - bi;
+    }
+    return (
+      a.modeLabel.localeCompare(b.modeLabel) ||
+      a.routeLabel.localeCompare(b.routeLabel)
+    );
+  });
+  return entries;
+}
+
+function modeLabel(mode: TransitMode): string {
+  return TRANSIT_MODES.find((m) => m.id === mode)?.label ?? mode;
+}
+
+function routeDisplayName(route: TransitRoute): string {
+  if (route.id === GREEN_LINE_ALL_ID) return "Green Line (all)";
+  if (route.id.startsWith("Green-")) {
+    return `Green Line ${route.id.replace("Green-", "")}`;
+  }
+  if (route.shortName) return route.shortName;
+  return route.label;
+}
 
 /** A stop reachable on a specific mode + route (for the all-stations picker). */
 export interface NetworkStopEntry {
@@ -26,16 +173,6 @@ export interface NetworkStopEntry {
   routeLabel: string;
   routeShortName?: string;
   routeColor: string;
-}
-
-function modeLabel(mode: TransitMode): string {
-  return TRANSIT_MODES.find((m) => m.id === mode)?.label ?? mode;
-}
-
-function routeDisplayName(route: TransitRoute): string {
-  if (route.id === GREEN_LINE_ALL_ID) return "Green Line";
-  if (route.shortName) return route.shortName;
-  return route.label;
 }
 
 let networkCatalogPromise: Promise<NetworkStopEntry[]> | null = null;
@@ -216,29 +353,63 @@ export async function fetchRoutesForMode(mode: TransitMode): Promise<TransitRout
   if (!res.ok) throw new Error(`Routes HTTP ${res.status}`);
 
   const body = (await res.json()) as { data: MbtaRouteResource[] };
-  const routes: TransitRoute[] = (body.data ?? []).map((r) => ({
-    id: r.id,
-    label: r.attributes.long_name || r.attributes.short_name || r.id,
-    shortName: r.attributes.short_name ?? undefined,
-    color: r.attributes.color ? `#${r.attributes.color}` : "#888888",
-    type: r.attributes.type,
-  }));
+  const routes: TransitRoute[] = (body.data ?? []).map(mapRouteResource);
 
   // Offer "Green Line" (all branches) above the individual B/C/D/E options.
   if (mode === "subway") {
     const greenIdx = routes.findIndex((r) => r.id.startsWith("Green-"));
     if (greenIdx >= 0) {
+      const sample = routes.find((r) => r.id === "Green-D") ?? routes[greenIdx]!;
       routes.splice(greenIdx, 0, {
         id: GREEN_LINE_ALL_ID,
         label: "Green Line",
         shortName: "Green",
         color: GREEN_LINE_COLOR,
         type: 0,
+        directionNames: sample.directionNames ?? ["West", "East"],
+        directionDestinations: sample.directionDestinations ?? [
+          "Branch terminals",
+          "Downtown",
+        ],
       });
     }
   }
 
   return routes;
+}
+
+/** Fetch a single route (includes direction names / termini). */
+export async function fetchRouteById(
+  routeId: string,
+): Promise<TransitRoute | null> {
+  if (!routeId) return null;
+  if (routeId === GREEN_LINE_ALL_ID) {
+    const sample = await fetchRouteById("Green-D");
+    return {
+      id: GREEN_LINE_ALL_ID,
+      label: "Green Line",
+      shortName: "Green",
+      color: GREEN_LINE_COLOR,
+      type: 0,
+      directionNames: sample?.directionNames ?? ["West", "East"],
+      directionDestinations: sample?.directionDestinations ?? [
+        "Branch terminals",
+        "Downtown",
+      ],
+    };
+  }
+
+  const apiKey = getApiKey();
+  const url =
+    `${MBTA_BASE}/routes/${encodeURIComponent(routeId)}` +
+    `?fields[route]=short_name,long_name,color,type,direction_names,direction_destinations` +
+    (apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : "");
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { data: MbtaRouteResource };
+  if (!body.data) return null;
+  return mapRouteResource(body.data);
 }
 
 export async function fetchStopsForRoute(routeId: string): Promise<TransitStop[]> {
