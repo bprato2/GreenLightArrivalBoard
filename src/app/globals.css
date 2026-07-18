@@ -67,6 +67,38 @@ body:has([data-allow-scroll="true"]) {
   );
 }
 
+@keyframes alert-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+    box-shadow: 0 0 22px rgba(52, 211, 153, 0.95);
+  }
+}
+
+.animate-alert-pulse {
+  animation: alert-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes train-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(110, 231, 183, 1);
+  }
+}
+
+.animate-train-glow {
+  animation: train-glow 2.4s ease-in-out infinite;
+}
+
 @keyframes leave-now-blink {
   0%,
   100% {
@@ -104,8 +136,14 @@ body:has([data-allow-scroll="true"]) {
   text-shadow: none;
 }
 
+.green-line-bullet {
+  box-shadow: none;
+}
+
 /* Prefer reduced motion on accessibility request — keep kiosk calm if needed */
 @media (prefers-reduced-motion: reduce) {
+  .animate-alert-pulse,
+  .animate-train-glow,
   .animate-pulse,
   .animate-leave-now-blink,
   .marquee-track {

@@ -17,14 +17,14 @@ const stationFont = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "GreenLight Arrival Board · MBTA",
+  title: "Newton Highlands · Green Line D",
   description:
-    "MBTA LED arrival board and trip planner — subway, Commuter Rail, and bus live data plus schedule search.",
+    "MBTA Green Line D LED arrival board for Newton Highlands — live SSE predictions for wall-mounted kiosk displays.",
   applicationName: "GreenLight Arrival Board",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "MBTA Board",
+    title: "Green Line D",
   },
 };
 

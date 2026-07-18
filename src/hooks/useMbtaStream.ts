@@ -8,10 +8,10 @@ import {
   deriveBoardState,
   emptyCollection,
   getApiKey,
-  type BoardFilter,
 } from "@/lib/mbta/parse";
 import type { Arrival, MapTrain, StreamCollection } from "@/lib/mbta/types";
 
+/** MBTA streams can go quiet; force a clean reconnect periodically. */
 const RECONNECT_MS = 2 * 60 * 60 * 1000;
 const TICK_MS = 1000;
 
@@ -24,25 +24,13 @@ export interface UseMbtaStreamResult {
   nowMs: number;
 }
 
-export interface UseMbtaStreamOptions {
-  routeColor?: string;
-  /** When false, skip connecting (e.g. Amtrak mode). */
-  enabled?: boolean;
-}
-
 /**
- * Dual SSE subscription: predictions for the selected stop + vehicles on the route.
+ * Dual SSE subscription: predictions for Newton Highlands + vehicles on Green-D.
+ * Maintains an in-memory JSON:API collection and derives board rows once per second
+ * so countdown text stays smooth without thrashing React on every vehicle GPS tick.
  */
-export function useMbtaStream(
-  filter: BoardFilter,
-  options: UseMbtaStreamOptions = {},
-): UseMbtaStreamResult {
-  const { routeColor = "#00843d", enabled = true } = options;
+export function useMbtaStream(): UseMbtaStreamResult {
   const collectionRef = useRef<StreamCollection>(emptyCollection());
-  const filterRef = useRef(filter);
-  filterRef.current = filter;
-  const colorRef = useRef(routeColor);
-  colorRef.current = routeColor;
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [trains, setTrains] = useState<MapTrain[]>([]);
   const [connected, setConnected] = useState(false);
@@ -59,14 +47,6 @@ export function useMbtaStream(
   }, []);
 
   useEffect(() => {
-    if (!enabled) {
-      setConnected(false);
-      setArrivals([]);
-      setTrains([]);
-      setError(null);
-      return;
-    }
-
     const apiKey = getApiKey();
     if (!apiKey) {
       setError("Missing NEXT_PUBLIC_MBTA_API_KEY");
@@ -115,11 +95,9 @@ export function useMbtaStream(
     predOpen.current = false;
     vehOpen.current = false;
     collectionRef.current = emptyCollection();
-    setArrivals([]);
-    setTrains([]);
 
-    attach(buildPredictionsUrl(apiKey, filter), "prediction", predOpen);
-    attach(buildVehiclesUrl(apiKey, filter.routeId), "vehicle", vehOpen);
+    attach(buildPredictionsUrl(apiKey), "prediction", predOpen);
+    attach(buildVehiclesUrl(apiKey), "vehicle", vehOpen);
 
     const reconnectTimer = window.setTimeout(() => {
       if (!cancelled) setGeneration((g) => g + 1);
@@ -132,33 +110,20 @@ export function useMbtaStream(
       predOpen.current = false;
       vehOpen.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [
-    enabled,
-    filter.stopId,
-    filter.directionId,
-    filter.routeId,
-    generation,
-    syncConnected,
-  ]);
+  }, [generation, syncConnected]);
 
+  // 1 Hz display clock — cheap countdown updates.
   useEffect(() => {
-    if (!enabled) return;
     const id = window.setInterval(() => {
       const now = Date.now();
       setNowMs(now);
-      const derived = deriveBoardState(
-        collectionRef.current,
-        now,
-        filterRef.current,
-        colorRef.current,
-      );
+      const derived = deriveBoardState(collectionRef.current, now);
       setArrivals(derived.arrivals);
       setTrains(derived.trains);
     }, TICK_MS);
 
     return () => window.clearInterval(id);
-  }, [enabled]);
+  }, []);
 
   return { arrivals, trains, connected, error, lastEventAt, nowMs };
 }

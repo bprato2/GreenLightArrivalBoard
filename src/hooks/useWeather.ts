@@ -5,7 +5,7 @@ import { fetchWeather, type WeatherSnapshot } from "@/lib/weather";
 
 const REFRESH_MS = 10 * 60 * 1000;
 
-export function useWeather(enabled: boolean, stationId: string) {
+export function useWeather(enabled: boolean) {
   const [data, setData] = useState<WeatherSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,7 +16,7 @@ export function useWeather(enabled: boolean, stationId: string) {
 
     const load = async () => {
       try {
-        const snap = await fetchWeather(stationId);
+        const snap = await fetchWeather();
         if (!cancelled) {
           setData(snap);
           setError(null);
@@ -32,7 +32,7 @@ export function useWeather(enabled: boolean, stationId: string) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [enabled, stationId]);
+  }, [enabled]);
 
   return { data, error };
 }

@@ -3,8 +3,6 @@ import {
   SETTINGS_STORAGE_KEY,
   type BoardSettings,
 } from "@/types/settings";
-import { coerceDirection } from "@/lib/mbta/boardConfig";
-import { isAppView, isTransitMode } from "@/lib/providers/types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -23,15 +21,6 @@ export function loadSettings(): BoardSettings {
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
-  }
-}
-
-export function hasStoredSettings(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(SETTINGS_STORAGE_KEY) !== null;
-  } catch {
-    return false;
   }
 }
 
@@ -69,33 +58,6 @@ function sanitizeSettings(partial: Record<string, unknown>): Partial<BoardSettin
   }
   if (typeof partial.settingsPin === "string" && /^\d{4,8}$/.test(partial.settingsPin)) {
     next.settingsPin = partial.settingsPin;
-  }
-  if (isTransitMode(partial.mode)) {
-    next.mode = partial.mode;
-  }
-  if (typeof partial.routeId === "string" && partial.routeId) {
-    next.routeId = partial.routeId;
-  }
-  if (typeof partial.stopId === "string" && partial.stopId) {
-    next.stopId = partial.stopId;
-  }
-  if (typeof partial.stopName === "string") {
-    next.stopName = partial.stopName.slice(0, 120);
-  }
-  if (typeof partial.stopLat === "number" && Number.isFinite(partial.stopLat)) {
-    next.stopLat = partial.stopLat;
-  }
-  if (typeof partial.stopLon === "number" && Number.isFinite(partial.stopLon)) {
-    next.stopLon = partial.stopLon;
-  }
-  if (typeof partial.directionId === "number") {
-    next.directionId = coerceDirection(partial.directionId);
-  }
-  if (isAppView(partial.appView)) {
-    next.appView = partial.appView;
-  }
-  if (typeof partial.routeColor === "string" && /^#[0-9a-fA-F]{6}$/.test(partial.routeColor)) {
-    next.routeColor = partial.routeColor;
   }
 
   return next;

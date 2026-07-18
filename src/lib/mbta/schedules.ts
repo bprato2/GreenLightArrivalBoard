@@ -1,20 +1,14 @@
-import { GREEN_LINE_COLOR, ROUTE_ID, type DirectionId } from "./boardConfig";
-import { TARGET_STOP_ID } from "./stations";
+import { INBOUND_DIRECTION_ID, TARGET_STOP_ID } from "./stations";
 import type { Arrival, ScheduleResource } from "./types";
-import { normalizeHeadsign } from "./headsign";
+import { normalizeInboundHeadsign } from "./headsign";
 
 const MBTA_BASE = "https://api-v3.mbta.com";
 
-export function buildSchedulesUrl(
-  apiKey: string,
-  stopId: string = TARGET_STOP_ID,
-  directionId: DirectionId = 1,
-  routeId: string = ROUTE_ID,
-): string {
+export function buildSchedulesUrl(apiKey: string): string {
   const params = new URLSearchParams({
-    "filter[stop]": stopId,
-    "filter[route]": routeId,
-    "filter[direction_id]": String(directionId),
+    "filter[stop]": TARGET_STOP_ID,
+    "filter[route]": "Green-D",
+    "filter[direction_id]": INBOUND_DIRECTION_ID,
     sort: "arrival_time",
     include: "trip",
     api_key: apiKey,
@@ -27,15 +21,8 @@ interface ScheduleFetchResult {
   trips: Map<string, { headsign: string }>;
 }
 
-export async function fetchSchedules(
-  apiKey: string,
-  stopId: string = TARGET_STOP_ID,
-  directionId: DirectionId = 1,
-  routeId: string = ROUTE_ID,
-): Promise<ScheduleFetchResult> {
-  const res = await fetch(buildSchedulesUrl(apiKey, stopId, directionId, routeId), {
-    cache: "no-store",
-  });
+export async function fetchInboundSchedules(apiKey: string): Promise<ScheduleFetchResult> {
+  const res = await fetch(buildSchedulesUrl(apiKey), { cache: "no-store" });
   if (!res.ok) throw new Error(`Schedules HTTP ${res.status}`);
 
   const body = (await res.json()) as {
@@ -53,20 +40,13 @@ export async function fetchSchedules(
   return { schedules: body.data ?? [], trips };
 }
 
-export async function fetchInboundSchedules(apiKey: string): Promise<ScheduleFetchResult> {
-  return fetchSchedules(apiKey, TARGET_STOP_ID, 1, ROUTE_ID);
-}
-
-/** Next N scheduled departures/arrivals not already covered by live predictions. */
+/** Next N scheduled inbound departures/arrivals not already covered by live predictions. */
 export function deriveScheduledArrivals(
   schedules: ScheduleResource[],
   trips: Map<string, { headsign: string }>,
   liveArrivals: Arrival[],
   nowMs: number,
   limit = 2,
-  directionId: DirectionId = 1,
-  routeColor: string = GREEN_LINE_COLOR,
-  routeId: string = ROUTE_ID,
 ): Arrival[] {
   const liveTripIds = new Set(
     liveArrivals.filter((a) => a.tripId).map((a) => a.tripId as string),
@@ -74,12 +54,6 @@ export function deriveScheduledArrivals(
   const liveEtaKeys = new Set(liveArrivals.map((a) => Math.round(a.etaMs / 60_000)));
 
   const rows: Arrival[] = [];
-  const isGreenD = routeId === ROUTE_ID;
-  const defaultHeadsign = isGreenD
-    ? directionId === 1
-      ? "Union Square"
-      : "Riverside"
-    : "Scheduled";
 
   for (const schedule of schedules) {
     if (rows.length >= limit) break;
@@ -99,15 +73,14 @@ export function deriveScheduledArrivals(
     if (liveEtaKeys.has(etaMinute)) continue;
 
     const trip = tripId ? trips.get(tripId) : undefined;
-    const raw = trip?.headsign ?? defaultHeadsign;
-    const headsign = isGreenD ? normalizeHeadsign(raw, directionId) : raw;
+    const headsign = normalizeInboundHeadsign(trip?.headsign ?? "Union Square");
     const minutesAway = Math.max(0, Math.ceil((etaMs - nowMs) / 60_000));
 
     rows.push({
       id: `sched-${schedule.id}`,
       vehicleId: null,
       tripId,
-      directionId,
+      directionId: 1,
       headsign,
       etaMs,
       minutesAway,
@@ -120,7 +93,6 @@ export function deriveScheduledArrivals(
       isApproaching: false,
       mbtaStatus: null,
       rowKind: "scheduled",
-      routeColor,
     });
   }
 

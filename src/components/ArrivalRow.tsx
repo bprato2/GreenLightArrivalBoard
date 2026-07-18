@@ -2,13 +2,8 @@
 
 import { motion } from "framer-motion";
 import { MarqueeText } from "@/components/MarqueeText";
-import {
-  formatArrivalClockTime,
-  formatArrivalDisplay,
-  isStatusDisplay,
-} from "@/lib/format";
+import { formatArrivalDisplay, isStatusDisplay } from "@/lib/format";
 import { formatMbtaHeadsign } from "@/lib/mbta/headsign";
-import { GREEN_LINE_COLOR } from "@/lib/mbta/boardConfig";
 import type { Arrival } from "@/lib/mbta/types";
 
 interface ArrivalRowProps {
@@ -20,11 +15,9 @@ interface ArrivalRowProps {
 export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
   const isScheduled = arrival.rowKind === "scheduled";
   const eta = formatArrivalDisplay(arrival);
-  const clockTime = formatArrivalClockTime(arrival.etaMs);
   const showStatusStyle = !isScheduled && isStatusDisplay(eta);
   const glowPx = 4 + glow * 14;
   const headsign = formatMbtaHeadsign(arrival.headsign);
-  const lineColor = arrival.routeColor ?? GREEN_LINE_COLOR;
 
   return (
     <motion.div
@@ -33,14 +26,8 @@ export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.35, delay: Math.min(index, 4) * 0.04 }}
-      className="arrival-row grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-amber-900/25 py-2.5 px-1"
+      className="arrival-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-amber-900/25 py-2.5 px-1"
     >
-      <span
-        className="h-3 w-3 shrink-0 rounded-full"
-        style={{ backgroundColor: lineColor, boxShadow: `0 0 8px ${lineColor}` }}
-        aria-hidden
-      />
-
       <div className="min-w-0">
         {isScheduled && (
           <div className="led-text mb-0.5 text-[0.6rem] uppercase tracking-[0.28em] text-amber-600/70">
@@ -87,13 +74,6 @@ export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
           }}
         >
           {eta}
-        </div>
-        <div
-          className={`led-text mt-0.5 text-[clamp(0.65rem,1.2vw,0.85rem)] tabular-nums tracking-wide ${
-            isScheduled ? "text-amber-500/60" : "text-amber-600/55"
-          }`}
-        >
-          {clockTime}
         </div>
       </div>
     </motion.div>

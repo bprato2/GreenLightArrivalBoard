@@ -1,40 +1,23 @@
 /** Persisted board preferences (localStorage). */
-
-import type { DirectionId } from "@/lib/mbta/boardConfig";
-import {
-  DEFAULT_MODE,
-  DEFAULT_ROUTE_ID,
-  DEFAULT_STOP_ID,
-} from "@/lib/mbta/boardConfig";
-import type { AppView, TransitMode } from "@/lib/providers/types";
-
 export interface BoardSettings {
+  /** Spoken arrival announcements via Web Audio + SpeechSynthesis. */
   announcementsEnabled: boolean;
+  /** Upper-right weather widget. */
   weatherEnabled: boolean;
+  /** Bottom Green Line D mini-map. */
   miniMapEnabled: boolean;
+  /** Minutes away at which the green pulse starts (inclusive lower bound of window). */
   alertPulseMaxMinutes: number;
+  /** Minutes away at which the green pulse starts (inclusive upper bound). Default 7. */
   alertPulseMinMinutes: number;
+  /** Minutes away at which the solid green "imminent" state begins. Default 2. */
   alertImminentMinutes: number;
+  /** LED text-shadow intensity, 0–1. */
   ledGlowIntensity: number;
+  /** Optional webhook URL for Home Assistant / ESPHome / automation bridges. */
   alertWebhookUrl: string;
+  /** Settings page PIN (local only). */
   settingsPin: string;
-  /** Subway / CR / Bus / Amtrak. */
-  mode: TransitMode;
-  /** MBTA route id (e.g. Green-D, CR-Worcester, 1). */
-  routeId: string;
-  /** Selected stop / parent station id. */
-  stopId: string;
-  /** Display name for the selected stop (cached from catalog). */
-  stopName: string;
-  /** Cached stop coordinates for walk estimates. */
-  stopLat: number;
-  stopLon: number;
-  /** 1 = inbound, 0 = outbound. */
-  directionId: DirectionId;
-  /** Primary chrome view. */
-  appView: AppView;
-  /** Cached route color (#rrggbb) for accents. */
-  routeColor: string;
 }
 
 export const DEFAULT_SETTINGS: BoardSettings = {
@@ -47,15 +30,6 @@ export const DEFAULT_SETTINGS: BoardSettings = {
   ledGlowIntensity: 0.65,
   alertWebhookUrl: "",
   settingsPin: "1234",
-  mode: DEFAULT_MODE,
-  routeId: DEFAULT_ROUTE_ID,
-  stopId: DEFAULT_STOP_ID,
-  stopName: "Newton Highlands",
-  stopLat: 42.3222,
-  stopLon: -71.2054,
-  directionId: 1,
-  appView: "board",
-  routeColor: "#00843d",
 };
 
 export const SETTINGS_STORAGE_KEY = "greenlight-board-settings";

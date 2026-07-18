@@ -29,18 +29,6 @@ export function formatMinutes(minutes: number): string {
   return `${minutes} min`;
 }
 
-/** Clock time for a predicted arrival (America/New_York). */
-export function formatArrivalClockTime(etaMs: number): string {
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "America/New_York",
-  })
-    .format(new Date(etaMs))
-    .replace(/\s*(AM|PM)/i, "");
-}
-
 /** Normalize MBTA prediction status to sign-style labels. */
 export function formatMbtaStatusLabel(status: string | null | undefined): string | null {
   if (!status?.trim()) return null;

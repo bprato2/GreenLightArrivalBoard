@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { deriveScheduledArrivals } from "@/lib/mbta/schedules";
+import {
+  deriveScheduledArrivals,
+} from "@/lib/mbta/schedules";
 import { getApiKey } from "@/lib/mbta/parse";
-import { getSchedules } from "@/lib/mbta/scheduleCache";
-import type { DirectionId } from "@/lib/mbta/boardConfig";
+import { getInboundSchedules } from "@/lib/mbta/scheduleCache";
 import type { Arrival, ScheduleResource } from "@/lib/mbta/types";
 
 const REFRESH_MS = 5 * 60 * 1000;
@@ -14,36 +15,20 @@ export interface UseMbtaSchedulesResult {
   schedules: ScheduleResource[];
 }
 
-export function useMbtaSchedules(
-  liveArrivals: Arrival[],
-  nowMs: number,
-  stopId: string,
-  directionId: DirectionId,
-  routeId: string,
-  routeColor: string,
-  enabled = true,
-): UseMbtaSchedulesResult {
+/**
+ * Polls MBTA schedules for the next inbound departures at Newton Highlands.
+ * Refreshes every 5 minutes; rows are merged with live predictions in the board.
+ */
+export function useMbtaSchedules(liveArrivals: Arrival[], nowMs: number): UseMbtaSchedulesResult {
   const [scheduled, setScheduled] = useState<Arrival[]>([]);
   const [schedules, setSchedules] = useState<ScheduleResource[]>([]);
   const tripsRef = useRef(new Map<string, { headsign: string }>());
   const schedulesRef = useRef<ScheduleResource[]>([]);
   const liveRef = useRef(liveArrivals);
-  const directionRef = useRef(directionId);
-  const routeIdRef = useRef(routeId);
-  const colorRef = useRef(routeColor);
 
   liveRef.current = liveArrivals;
-  directionRef.current = directionId;
-  routeIdRef.current = routeId;
-  colorRef.current = routeColor;
 
   useEffect(() => {
-    if (!enabled) {
-      setScheduled([]);
-      setSchedules([]);
-      return;
-    }
-
     const apiKey = getApiKey();
     if (!apiKey) return;
 
@@ -51,7 +36,7 @@ export function useMbtaSchedules(
 
     const load = async () => {
       try {
-        const result = await getSchedules(apiKey, stopId, directionId, routeId);
+        const result = await getInboundSchedules(apiKey);
         if (cancelled) return;
         tripsRef.current = result.trips;
         schedulesRef.current = result.schedules;
@@ -63,9 +48,6 @@ export function useMbtaSchedules(
             liveRef.current,
             Date.now(),
             2,
-            directionId,
-            routeColor,
-            routeId,
           ),
         );
       } catch {
@@ -79,10 +61,9 @@ export function useMbtaSchedules(
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [stopId, directionId, routeId, routeColor, enabled]);
+  }, []);
 
   useEffect(() => {
-    if (!enabled) return;
     setScheduled(
       deriveScheduledArrivals(
         schedulesRef.current,
@@ -90,12 +71,9 @@ export function useMbtaSchedules(
         liveArrivals,
         nowMs,
         2,
-        directionRef.current,
-        colorRef.current,
-        routeIdRef.current,
       ),
     );
-  }, [liveArrivals, nowMs, enabled]);
+  }, [liveArrivals, nowMs]);
 
   return { scheduled, schedules };
 }

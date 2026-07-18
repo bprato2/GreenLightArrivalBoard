@@ -1,23 +1,17 @@
 "use client";
 
 import { deriveServiceFrequency } from "@/lib/mbta/frequency";
-import type { Arrival, ScheduleResource } from "@/lib/mbta/types";
+import type { ScheduleResource } from "@/lib/mbta/types";
 
 interface ServiceFrequencyProps {
   schedules: ScheduleResource[];
-  arrivals: Arrival[];
   nowMs: number;
   glow: number;
 }
 
-/** Displays headway above the leave-now banner (schedules, with live fallback). */
-export function ServiceFrequency({
-  schedules,
-  arrivals,
-  nowMs,
-  glow,
-}: ServiceFrequencyProps) {
-  const { message, hasService } = deriveServiceFrequency(schedules, arrivals, nowMs);
+/** Displays scheduled headway for the current hour above the leave-now banner. */
+export function ServiceFrequency({ schedules, nowMs, glow }: ServiceFrequencyProps) {
+  const { message, hasService } = deriveServiceFrequency(schedules, nowMs);
 
   return (
     <section
