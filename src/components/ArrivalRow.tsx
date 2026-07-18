@@ -23,7 +23,7 @@ export function ArrivalRow({ arrival, index, glow }: ArrivalRowProps) {
   const clockTime = formatArrivalClockTime(arrival.etaMs);
   const showStatusStyle = !isScheduled && isStatusDisplay(eta);
   const glowPx = 4 + glow * 14;
-  const headsign = formatMbtaHeadsign(arrival.headsign);
+  const headsign = formatMbtaHeadsign(arrival.headsign, arrival.directionId);
   const lineColor = arrival.routeColor ?? GREEN_LINE_COLOR;
 
   return (

@@ -17,14 +17,22 @@ const ABBREVIATIONS: Record<string, string> = {
   riverside: "RIVERSIDE",
 };
 
+function isGenericHeadsign(raw: string): boolean {
+  return !raw || /^train$/i.test(raw) || /^trip$/i.test(raw);
+}
+
 /** Normalize terminating headsigns for the selected direction. */
 export function normalizeHeadsign(
   raw: string | null | undefined,
   directionId = 1,
+  terminusFallback?: string | null,
 ): string {
   const trimmed = raw?.trim() ?? "";
-  const fallback = directionId === 1 ? "Union Square" : "Riverside";
-  if (!trimmed) return fallback;
+  const terminus = terminusFallback?.trim() || "";
+  const fallback =
+    terminus || (directionId === 1 ? "Union Square" : "Riverside");
+
+  if (isGenericHeadsign(trimmed)) return fallback;
 
   const lower = trimmed.toLowerCase();
   if (directionId === 1) {
@@ -45,8 +53,12 @@ export function normalizeInboundHeadsign(raw: string | null | undefined): string
 }
 
 /** Format a headsign like an MBTA LED countdown sign (ALL-CAPS, abbreviated). */
-export function formatMbtaHeadsign(raw: string | null | undefined): string {
-  const normalized = normalizeHeadsign(raw);
+export function formatMbtaHeadsign(
+  raw: string | null | undefined,
+  directionId = 1,
+  terminusFallback?: string | null,
+): string {
+  const normalized = normalizeHeadsign(raw, directionId, terminusFallback);
   const lower = normalized.toLowerCase();
 
   for (const [key, abbrev] of Object.entries(ABBREVIATIONS)) {

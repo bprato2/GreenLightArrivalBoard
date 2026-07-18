@@ -34,6 +34,8 @@ export interface UseMbtaStreamOptions {
   corridor?: MiniMapCorridor | null;
   /** Full ordered line for vehicle stop lookup / GPS projection. */
   line?: StationInfo[];
+  /** Route termini by direction_id for headsign fallback. */
+  directionDestinations?: string[] | null;
 }
 
 /**
@@ -48,6 +50,7 @@ export function useMbtaStream(
     enabled = true,
     corridor = null,
     line = [],
+    directionDestinations = null,
   } = options;
   const collectionRef = useRef<StreamCollection>(emptyCollection());
   const filterRef = useRef(filter);
@@ -58,6 +61,8 @@ export function useMbtaStream(
   corridorRef.current = corridor;
   const lineRef = useRef(line);
   lineRef.current = line;
+  const destinationsRef = useRef(directionDestinations);
+  destinationsRef.current = directionDestinations;
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [trains, setTrains] = useState<MapTrain[]>([]);
   const [connected, setConnected] = useState(false);
@@ -169,6 +174,7 @@ export function useMbtaStream(
         colorRef.current,
         corridorRef.current,
         lineRef.current,
+        destinationsRef.current,
       );
       setArrivals(derived.arrivals);
       setTrains(derived.trains);

@@ -67,6 +67,7 @@ export function deriveScheduledArrivals(
   directionId: DirectionId = 1,
   routeColor: string = GREEN_LINE_COLOR,
   routeId: string = ROUTE_ID,
+  directionDestinations: string[] | null = null,
 ): Arrival[] {
   const liveTripIds = new Set(
     liveArrivals.filter((a) => a.tripId).map((a) => a.tripId as string),
@@ -75,11 +76,14 @@ export function deriveScheduledArrivals(
 
   const rows: Arrival[] = [];
   const onGreenLine = isGreenLineRoute(routeId);
-  const defaultHeadsign = onGreenLine
-    ? directionId === 1
-      ? "Union Square"
-      : "Riverside"
-    : "Scheduled";
+  const terminusFallback =
+    directionDestinations?.[directionId]?.trim() ||
+    (onGreenLine
+      ? directionId === 1
+        ? "Union Square"
+        : "Riverside"
+      : null);
+  const defaultHeadsign = terminusFallback || "Scheduled";
 
   for (const schedule of schedules) {
     if (rows.length >= limit) break;
@@ -99,8 +103,8 @@ export function deriveScheduledArrivals(
     if (liveEtaKeys.has(etaMinute)) continue;
 
     const trip = tripId ? trips.get(tripId) : undefined;
-    const raw = trip?.headsign ?? defaultHeadsign;
-    const headsign = onGreenLine ? normalizeHeadsign(raw, directionId) : raw;
+    const raw = trip?.headsign?.trim() ?? "";
+    const headsign = normalizeHeadsign(raw || defaultHeadsign, directionId, terminusFallback);
     const minutesAway = Math.max(0, Math.ceil((etaMs - nowMs) / 60_000));
 
     rows.push({

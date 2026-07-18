@@ -363,6 +363,8 @@ export function deriveBoardState(
   routeColor: string = GREEN_LINE_COLOR,
   mapCorridor: MiniMapCorridor | null = null,
   fullLine: StationInfo[] = [],
+  /** Route termini indexed by direction_id — used when trip headsign is missing. */
+  directionDestinations: string[] | null = null,
 ): { arrivals: Arrival[]; trains: MapTrain[] } {
   const arrivals: Arrival[] = [];
   const onGreenLine = isGreenLineRoute(filter.routeId);
@@ -370,6 +372,13 @@ export function deriveBoardState(
   const lineForLookup =
     fullLine.length > 0 ? fullLine : (corridor?.stations ?? []);
   const showMap = Boolean(corridor && corridor.stations.length > 0);
+  const terminusFallback =
+    directionDestinations?.[filter.directionId]?.trim() ||
+    (onGreenLine
+      ? filter.directionId === 1
+        ? "Union Square"
+        : "Riverside"
+      : null);
 
   for (const prediction of collection.predictions.values()) {
     const attrs = prediction.attributes;
@@ -401,10 +410,13 @@ export function deriveBoardState(
       trip?.attributes.direction_id ?? attrs.direction_id ?? 0;
     if (directionId !== filter.directionId) continue;
 
-    const rawHeadsign = trip?.attributes.headsign || attrs.status || "Train";
-    const headsign = onGreenLine
-      ? normalizeHeadsign(rawHeadsign, filter.directionId)
-      : rawHeadsign;
+    // Never use prediction status ("Approaching", etc.) as the destination label.
+    const rawHeadsign = trip?.attributes.headsign?.trim() || "";
+    const headsign = normalizeHeadsign(
+      rawHeadsign,
+      filter.directionId,
+      terminusFallback,
+    );
 
     arrivals.push({
       id: prediction.id,

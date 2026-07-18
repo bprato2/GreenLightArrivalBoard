@@ -22,6 +22,7 @@ export function useMbtaSchedules(
   routeId: string,
   routeColor: string,
   enabled = true,
+  directionDestinations: string[] | null = null,
 ): UseMbtaSchedulesResult {
   const [scheduled, setScheduled] = useState<Arrival[]>([]);
   const [schedules, setSchedules] = useState<ScheduleResource[]>([]);
@@ -31,11 +32,13 @@ export function useMbtaSchedules(
   const directionRef = useRef(directionId);
   const routeIdRef = useRef(routeId);
   const colorRef = useRef(routeColor);
+  const destinationsRef = useRef(directionDestinations);
 
   liveRef.current = liveArrivals;
   directionRef.current = directionId;
   routeIdRef.current = routeId;
   colorRef.current = routeColor;
+  destinationsRef.current = directionDestinations;
 
   useEffect(() => {
     if (!enabled) {
@@ -66,6 +69,7 @@ export function useMbtaSchedules(
             directionId,
             routeColor,
             routeId,
+            destinationsRef.current,
           ),
         );
       } catch {
@@ -93,9 +97,10 @@ export function useMbtaSchedules(
         directionRef.current,
         colorRef.current,
         routeIdRef.current,
+        destinationsRef.current,
       ),
     );
-  }, [liveArrivals, nowMs, enabled]);
+  }, [liveArrivals, nowMs, enabled, directionDestinations]);
 
   return { scheduled, schedules };
 }

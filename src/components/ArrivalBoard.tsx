@@ -60,11 +60,27 @@ export function ArrivalBoard() {
     directionId: settings.directionId,
     routeId: settings.routeId,
   };
+  const [routeMeta, setRouteMeta] = useState<TransitRoute | null>(null);
+  useEffect(() => {
+    if (!settings.routeId || isAmtrak) {
+      setRouteMeta(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchRouteById(settings.routeId).then((route) => {
+      if (!cancelled) setRouteMeta(route);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.routeId, isAmtrak]);
+  const directionDestinations = routeMeta?.directionDestinations ?? null;
   const { arrivals, trains, connected, error, nowMs } = useMbtaStream(filter, {
     routeColor: settings.routeColor,
     enabled: !isAmtrak && Boolean(settings.routeId && settings.stopId),
     corridor,
     line,
+    directionDestinations,
   });
   const { scheduled, schedules } = useMbtaSchedules(
     arrivals,
@@ -74,6 +90,7 @@ export function ArrivalBoard() {
     settings.routeId,
     settings.routeColor,
     !isAmtrak && Boolean(settings.routeId && settings.stopId),
+    directionDestinations,
   );
   const boardRows = mergeBoardRows(arrivals, scheduled);
   const { timeLine } = useClock();
@@ -89,20 +106,6 @@ export function ArrivalBoard() {
     arrivals.map((a) => a.minutesAway),
     walk.estimate?.minutes ?? null,
   );
-  const [routeMeta, setRouteMeta] = useState<TransitRoute | null>(null);
-  useEffect(() => {
-    if (!settings.routeId || isAmtrak) {
-      setRouteMeta(null);
-      return;
-    }
-    let cancelled = false;
-    void fetchRouteById(settings.routeId).then((route) => {
-      if (!cancelled) setRouteMeta(route);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [settings.routeId, isAmtrak]);
   const directionOpt = getDirectionOption(settings.directionId, routeMeta);
   const stationName =
     settings.stopName ||
