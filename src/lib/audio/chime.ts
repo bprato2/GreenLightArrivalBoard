@@ -89,11 +89,11 @@ export const playMbtaChime = playMBTAChime;
 export async function unlockAudio(): Promise<void> {
   const ctx = getAudioContext();
   if (!ctx) return;
-  if (ctx.state === "running") return;
+  if (isAudioUnlocked()) return;
 
   if (unlockPromise) {
     await unlockPromise;
-    if (ctx.state === "running") return;
+    if (isAudioUnlocked()) return;
   }
 
   const attempt = (async () => {
