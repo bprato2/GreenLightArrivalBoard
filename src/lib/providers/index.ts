@@ -8,6 +8,7 @@ export type {
 } from "./types";
 export {
   TRANSIT_MODES,
+  MBTA_LIVE_MODES,
   isAppView,
   isTransitMode,
   routeTypesForMode,

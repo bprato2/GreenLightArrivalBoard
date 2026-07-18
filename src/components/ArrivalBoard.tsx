@@ -173,6 +173,7 @@ useArrivalAlert(closestMinutes, settings);
         onModeChange={setMode}
         onViewChange={(view) => {
           if (view === "plan") router.push("/plan");
+          if (view === "map") router.push("/map");
         }}
       />
 

@@ -39,6 +39,7 @@ export default function PlanPage() {
         onModeChange={setMode}
         onViewChange={(view) => {
           if (view === "board") router.push("/");
+          if (view === "map") router.push("/map");
         }}
       />
       {settings.mode === "amtrak" ? (

@@ -19,6 +19,7 @@ import {
   fetchRouteById,
 } from "@/lib/mbta/catalog";
 import type { TransitMode, TransitRoute, TransitStop } from "@/lib/providers/types";
+import { TRANSIT_MODES } from "@/lib/providers/types";
 import type { BoardSettings } from "@/types/settings";
 
 interface BoardRouteControlsProps {
@@ -33,13 +34,6 @@ interface BoardRouteControlsProps {
 
 const selectClass =
   "rounded border border-amber-900/50 bg-black px-2 py-1.5 text-amber-200 outline-none focus:border-amber-500";
-
-const MODES: { id: TransitMode; label: string }[] = [
-  { id: "subway", label: "Subway" },
-  { id: "commuter_rail", label: "Commuter Rail" },
-  { id: "bus", label: "Bus" },
-  { id: "amtrak", label: "Amtrak" },
-];
 
 export function DirectionSelect({
   settings,
@@ -262,7 +256,7 @@ export function BoardRouteControls({
             value={settings.mode}
             onChange={(e) => setMode(e.target.value as TransitMode)}
           >
-            {MODES.map((m) => (
+            {TRANSIT_MODES.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label}
               </option>
@@ -329,7 +323,7 @@ export function BoardRouteControls({
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
       <p className="mt-2 text-xs text-zinc-500">
         With a departure station selected, routes that stop there appear first.
-        Below that are other routes in the current mode (subway / CR / bus). Use
+        Below that are other routes in the current mode (subway / CR / bus / ferry). Use
         search to find routes in other modes.
       </p>
     </fieldset>

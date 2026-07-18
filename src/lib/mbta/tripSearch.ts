@@ -7,6 +7,7 @@ import { routeTypesForMode } from "@/lib/providers/types";
 import {
   estimateBusFare,
   estimateCommuterRailFare,
+  estimateFerryFare,
   estimateSubwayFare,
   type FareEstimate,
 } from "@/lib/fares";
@@ -153,6 +154,8 @@ function fareForMode(
       return estimateBusFare(routeId, routeName);
     case "commuter_rail":
       return estimateCommuterRailFare(originStopId, destinationStopId);
+    case "ferry":
+      return estimateFerryFare(routeId);
     default:
       return {
         amountUsd: null,

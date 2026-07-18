@@ -10,7 +10,11 @@ import {
 } from "@/lib/mbta/boardConfig";
 import { getApiKey } from "@/lib/mbta/parse";
 import type { TransitMode, TransitRoute, TransitStop } from "@/lib/providers/types";
-import { routeTypesForMode, TRANSIT_MODES } from "@/lib/providers/types";
+import {
+  MBTA_LIVE_MODES,
+  routeTypesForMode,
+  TRANSIT_MODES,
+} from "@/lib/providers/types";
 
 const MBTA_BASE = "https://api-v3.mbta.com";
 
@@ -28,6 +32,7 @@ export interface NetworkRouteEntry {
 function modeFromRouteType(type: number | undefined): TransitMode {
   if (type === 2) return "commuter_rail";
   if (type === 3) return "bus";
+  if (type === 4) return "ferry";
   return "subway";
 }
 
@@ -61,7 +66,7 @@ function mapRouteResource(r: MbtaRouteResource): TransitRoute {
 
 let networkRouteCatalogPromise: Promise<NetworkRouteEntry[]> | null = null;
 
-/** All subway / CR / bus routes (session-cached). */
+/** All subway / CR / bus / ferry routes (session-cached). */
 export function fetchNetworkRouteCatalog(): Promise<NetworkRouteEntry[]> {
   if (!networkRouteCatalogPromise) {
     networkRouteCatalogPromise = buildNetworkRouteCatalog().catch((err) => {
@@ -73,7 +78,7 @@ export function fetchNetworkRouteCatalog(): Promise<NetworkRouteEntry[]> {
 }
 
 async function buildNetworkRouteCatalog(): Promise<NetworkRouteEntry[]> {
-  const modes: TransitMode[] = ["subway", "commuter_rail", "bus"];
+  const modes = MBTA_LIVE_MODES;
   const entries: NetworkRouteEntry[] = [];
   const seen = new Set<string>();
 
@@ -199,7 +204,7 @@ async function mapPool<T, R>(
 }
 
 /**
- * Load stops across subway, commuter rail, and bus with mode/route metadata.
+ * Load stops across subway, commuter rail, bus, and ferry with mode/route metadata.
  * Cached for the session. Bus routes are capped to keep the first load usable.
  */
 export function fetchNetworkStopCatalog(): Promise<NetworkStopEntry[]> {
@@ -213,7 +218,7 @@ export function fetchNetworkStopCatalog(): Promise<NetworkStopEntry[]> {
 }
 
 async function buildNetworkStopCatalog(): Promise<NetworkStopEntry[]> {
-  const modes: TransitMode[] = ["subway", "commuter_rail", "bus"];
+  const modes = MBTA_LIVE_MODES;
   const entries: NetworkStopEntry[] = [];
   const seen = new Set<string>();
 

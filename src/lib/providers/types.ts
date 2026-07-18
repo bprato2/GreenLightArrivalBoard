@@ -3,9 +3,22 @@
  */
 
 /** App-level transit mode (Amtrak is informational only). */
-export type TransitMode = "subway" | "commuter_rail" | "bus" | "amtrak";
+export type TransitMode =
+  | "subway"
+  | "commuter_rail"
+  | "bus"
+  | "ferry"
+  | "amtrak";
 
-export type AppView = "board" | "plan";
+/** MBTA modes with live predictions/schedules (excludes Amtrak). */
+export const MBTA_LIVE_MODES: TransitMode[] = [
+  "subway",
+  "commuter_rail",
+  "bus",
+  "ferry",
+];
+
+export type AppView = "board" | "plan" | "map";
 
 /** Stable stop / station identity used by settings and board filters. */
 export interface TransitStop {
@@ -57,6 +70,7 @@ export const TRANSIT_MODES: { id: TransitMode; label: string }[] = [
   { id: "subway", label: "Subway" },
   { id: "commuter_rail", label: "Commuter Rail" },
   { id: "bus", label: "Bus" },
+  { id: "ferry", label: "Ferry" },
   { id: "amtrak", label: "Amtrak" },
 ];
 
@@ -69,6 +83,8 @@ export function routeTypesForMode(mode: TransitMode): number[] | null {
       return [2];
     case "bus":
       return [3];
+    case "ferry":
+      return [4];
     case "amtrak":
       return null;
   }
@@ -79,10 +95,11 @@ export function isTransitMode(value: unknown): value is TransitMode {
     value === "subway" ||
     value === "commuter_rail" ||
     value === "bus" ||
+    value === "ferry" ||
     value === "amtrak"
   );
 }
 
 export function isAppView(value: unknown): value is AppView {
-  return value === "board" || value === "plan";
+  return value === "board" || value === "plan" || value === "map";
 }

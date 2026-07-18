@@ -12,7 +12,13 @@ interface AppChromeProps {
   onViewChange?: (view: AppView) => void;
 }
 
-/** Top chrome: Board | Plan toggle + transit mode tabs. */
+const VIEW_HREF: Record<AppView, string> = {
+  board: "/",
+  plan: "/plan",
+  map: "/map",
+};
+
+/** Top chrome: Board | Map | Plan toggle + transit mode tabs. */
 export function AppChrome({
   mode,
   appView,
@@ -26,37 +32,36 @@ export function AppChrome({
         : "text-amber-800/80 hover:text-amber-500"
     }`;
 
+  const views: { id: AppView; label: string }[] = [
+    { id: "board", label: "Board" },
+    { id: "map", label: "Map" },
+    { id: "plan", label: "Plan" },
+  ];
+
   return (
     <div className="relative z-40 flex shrink-0 flex-col gap-2 border-b border-amber-900/40 bg-black/90 px-4 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
-          {onViewChange ? (
-            <>
-              <button
-                type="button"
-                className={tabClass(appView === "board")}
-                onClick={() => onViewChange("board")}
-              >
-                Board
-              </button>
-              <button
-                type="button"
-                className={tabClass(appView === "plan")}
-                onClick={() => onViewChange("plan")}
-              >
-                Plan
-              </button>
-            </>
-          ) : (
-            <>
-              <Link href="/" className={tabClass(appView === "board")}>
-                Board
-              </Link>
-              <Link href="/plan" className={tabClass(appView === "plan")}>
-                Plan
-              </Link>
-            </>
-          )}
+          {onViewChange
+            ? views.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  className={tabClass(appView === v.id)}
+                  onClick={() => onViewChange(v.id)}
+                >
+                  {v.label}
+                </button>
+              ))
+            : views.map((v) => (
+                <Link
+                  key={v.id}
+                  href={VIEW_HREF[v.id]}
+                  className={tabClass(appView === v.id)}
+                >
+                  {v.label}
+                </Link>
+              ))}
         </div>
         <span className="led-text text-[0.55rem] uppercase tracking-[0.25em] text-amber-700/70">
           MBTA

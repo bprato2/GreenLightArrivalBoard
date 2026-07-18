@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   if (!isTransitMode(mode) || mode === "amtrak") {
     return NextResponse.json(
-      { error: "mode must be subway, commuter_rail, or bus" },
+      { error: "mode must be subway, commuter_rail, bus, or ferry" },
       { status: 400 },
     );
   }

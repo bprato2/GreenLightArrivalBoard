@@ -61,16 +61,32 @@ export function buildPredictionsUrl(
   return `${MBTA_BASE}/predictions?${params.toString()}`;
 }
 
-export function buildVehiclesUrl(apiKey: string, routeId: string = ROUTE_ID): string {
+export function buildVehiclesUrl(
+  apiKey: string,
+  routeId: string = ROUTE_ID,
+): string {
   const params = new URLSearchParams({
     "filter[route]": expandRouteFilter(routeId),
-    include: "stop,trip",
+    include: "stop,trip,route",
     api_key: apiKey,
   });
   return `${MBTA_BASE}/vehicles?${params.toString()}`;
 }
 
-function relatedId(
+/** Build vehicles URL for one or many route ids. */
+export function buildVehiclesUrlForRoutes(
+  apiKey: string,
+  routeIds: string[],
+): string {
+  const expanded = [
+    ...new Set(
+      routeIds.flatMap((id) => expandRouteFilter(id).split(",")).filter(Boolean),
+    ),
+  ];
+  return buildVehiclesUrl(apiKey, expanded.join(",") || ROUTE_ID);
+}
+
+export function relatedId(
   resource: { relationships?: MbtaRelationships },
   key: string,
 ): string | null {

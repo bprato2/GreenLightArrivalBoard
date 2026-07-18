@@ -250,7 +250,9 @@ export function RouteSelect({
       ? "All commuter rail"
       : mode === "bus"
         ? "All bus"
-        : "All subway";
+        : mode === "ferry"
+          ? "All ferry"
+          : "All subway";
 
   const selectedEntry =
     atStop.find((e) => e.routeId === routeId) ??

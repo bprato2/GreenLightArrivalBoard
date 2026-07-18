@@ -217,6 +217,30 @@ export function estimateCommuterRailFare(
   };
 }
 
+export function estimateFerryFare(routeId?: string): FareEstimate {
+  const innerHarbor =
+    /Boat-F4|Boat-EastBoston|Charlestown|East.?Boston/i.test(routeId ?? "");
+  if (innerHarbor) {
+    return {
+      amountUsd: 0,
+      currency: "USD",
+      fareType: "Inner Harbor Ferry",
+      zoneInfo: null,
+      notes: "Inner Harbor ferry service is typically free. Confirm on mbta.com.",
+      officialUrl: "https://www.mbta.com/fares/ferry",
+    };
+  }
+  return {
+    amountUsd: null,
+    currency: "USD",
+    fareType: "Ferry (route-specific)",
+    zoneInfo: null,
+    notes:
+      "Outer harbor and commuter ferry fares vary by route. Check the official ferry fare table.",
+    officialUrl: "https://www.mbta.com/fares/ferry",
+  };
+}
+
 export function formatFareAmount(amountUsd: number | null): string {
   if (amountUsd === null) return "See mbta.com";
   return `$${amountUsd.toFixed(2)}`;
